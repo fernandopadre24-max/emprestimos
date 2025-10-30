@@ -12,32 +12,43 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { loans as initialLoans, customers as initialCustomers } from "@/lib/data"
+import { loans as initialLoans, customers as initialCustomers, bankAccounts as initialBankAccounts } from "@/lib/data"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import type { Loan, Customer, Installment } from "@/lib/types"
+import type { Loan, Customer, Installment, BankAccount, Transaction } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Check, ChevronDown, FilePenLine, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dialog"
 
 export default function EmprestimosPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<string[]>([]);
   const [expandedLoanIds, setExpandedLoanIds] = useState<string[]>([]);
+
+  const [isCreditDialogOpen, setCreditDialogOpen] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<{loanId: string, installment: Installment} | null>(null);
+
 
   useEffect(() => {
     const storedCustomers = localStorage.getItem("customers");
     const storedLoans = localStorage.getItem("loans");
+    const storedBankAccounts = localStorage.getItem("bankAccounts");
 
     const customersData = storedCustomers ? JSON.parse(storedCustomers) : initialCustomers;
     const loansData = storedLoans ? JSON.parse(storedLoans) : initialLoans;
+    const bankAccountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
+
 
     setCustomers(customersData);
     setLoans(loansData);
+    setBankAccounts(bankAccountsData);
 
     if (!storedCustomers) localStorage.setItem("customers", JSON.stringify(customersData));
     if (!storedLoans) localStorage.setItem("loans", JSON.stringify(loansData));
+    if (!storedBankAccounts) localStorage.setItem("bankAccounts", JSON.stringify(bankAccountsData));
   }, []);
 
   const updateAndStoreLoans = (newLoans: Loan[]) => {
@@ -48,6 +59,17 @@ export default function EmprestimosPage() {
   const updateAndStoreCustomers = (newCustomers: Customer[]) => {
     setCustomers(newCustomers);
     localStorage.setItem("customers", JSON.stringify(newCustomers));
+  }
+
+  const updateAndStoreBankAccounts = (newAccounts: BankAccount[]) => {
+    setBankAccounts(newAccounts);
+    localStorage.setItem("bankAccounts", JSON.stringify(newAccounts));
+  };
+  
+  const updateAndStoreTransactions = (newTransactions: Transaction[]) => {
+    const storedTransactions = localStorage.getItem("transactions") || "[]";
+    const transactions = JSON.parse(storedTransactions);
+    localStorage.setItem("transactions", JSON.stringify([...transactions, ...newTransactions]));
   }
 
 
@@ -80,15 +102,40 @@ export default function EmprestimosPage() {
     console.log("Editing loan:", loan);
   }
 
-  const handlePayInstallment = (loanId: string, installmentId: string) => {
+  const handlePayInstallmentClick = (loanId: string, installment: Installment) => {
+    setPaymentDetails({ loanId, installment });
+    setCreditDialogOpen(true);
+  };
+  
+
+  const handleConfirmPayment = (loanId: string, installmentId: string, accountId: string) => {
     const newLoans = loans.map(loan => {
       if (loan.id === loanId) {
+        let paidInstallment: Installment | undefined;
         const newInstallments = loan.installments.map(installment => {
           if (installment.id === installmentId) {
-            return { ...installment, status: 'Paga' as const };
+            paidInstallment = { ...installment, status: 'Paga' as const };
+            return paidInstallment;
           }
           return installment;
         });
+
+        if (paidInstallment) {
+          const newTransaction: Transaction = {
+            id: `T${(Math.random() + 1).toString(36).substring(7)}`,
+            accountId: accountId,
+            description: `Pagamento Parcela ${paidInstallment.installmentNumber} - Empréstimo ${loan.id}`,
+            amount: paidInstallment.amount,
+            date: new Date().toISOString(),
+            type: 'receita',
+          };
+          updateAndStoreTransactions([newTransaction]);
+
+          const newBankAccounts = bankAccounts.map(acc => 
+            acc.id === accountId ? {...acc, saldo: acc.saldo + paidInstallment!.amount} : acc
+          );
+          updateAndStoreBankAccounts(newBankAccounts);
+        }
 
         const allPaid = newInstallments.every(inst => inst.status === 'Paga');
         
@@ -114,6 +161,7 @@ export default function EmprestimosPage() {
             updateAndStoreCustomers(newCustomers);
         }
     }
+    setCreditDialogOpen(false);
   };
 
   const toggleCustomer = (customerId: string) => {
@@ -133,6 +181,7 @@ export default function EmprestimosPage() {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Todos os Empréstimos</CardTitle>
@@ -249,7 +298,7 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell className="text-right">
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => handlePayInstallment(loan.id, installment.id)} disabled={installment.status === 'Paga'}>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => handlePayInstallmentClick(loan.id, installment)} disabled={installment.status === 'Paga'}>
                                                                     <Check className="h-4 w-4" />
                                                                 </Button>
                                                             </TableCell>
@@ -273,5 +322,15 @@ export default function EmprestimosPage() {
         </Table>
       </CardContent>
     </Card>
+      <CreditPaymentDialog 
+        isOpen={isCreditDialogOpen}
+        onOpenChange={setCreditDialogOpen}
+        onSubmit={handleConfirmPayment}
+        paymentDetails={paymentDetails}
+        accounts={bankAccounts}
+      />
+    </>
   )
 }
+
+    

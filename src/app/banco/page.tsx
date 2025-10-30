@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   Table,
   TableBody,
@@ -25,7 +25,7 @@ import {
   Plus,
 } from "lucide-react"
 
-import { bankAccounts as initialBankAccounts, bankSummary, transactions as initialTransactions } from "@/lib/data"
+import { bankAccounts as initialBankAccounts, bankSummary as initialBankSummary, transactions as initialTransactions } from "@/lib/data"
 import type { BankAccount, Transaction, NewBankAccount } from "@/lib/types"
 
 import { AddAccountDialog } from "@/components/banco/add-account-dialog"
@@ -37,8 +37,9 @@ import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 
 export default function BancoPage() {
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(initialBankAccounts);
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [bankSummary, setBankSummary] = useState(initialBankSummary);
 
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
   const [isEditAccountOpen, setEditAccountOpen] = useState(false);
@@ -46,6 +47,40 @@ export default function BancoPage() {
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
+
+  useEffect(() => {
+    const storedBankAccounts = localStorage.getItem("bankAccounts");
+    const storedTransactions = localStorage.getItem("transactions");
+
+    const accountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
+    const transactionsData = storedTransactions ? JSON.parse(storedTransactions) : initialTransactions;
+
+    setBankAccounts(accountsData);
+    setTransactions(transactionsData);
+
+    if (!storedBankAccounts) localStorage.setItem("bankAccounts", JSON.stringify(accountsData));
+    if (!storedTransactions) localStorage.setItem("transactions", JSON.stringify(transactionsData));
+  }, []);
+
+  useEffect(() => {
+    const saldoContas = bankAccounts.reduce((acc, account) => acc + account.saldo, 0);
+    const receitas = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + t.amount, 0);
+    const despesas = transactions.filter(t => t.type === 'despesa').reduce((acc, t) => acc + t.amount, 0);
+    const balanco = receitas - despesas;
+    setBankSummary({ saldoContas, receitas, despesas, balanco });
+  }, [bankAccounts, transactions]);
+
+
+  const updateAndStoreBankAccounts = (newAccounts: BankAccount[]) => {
+    setBankAccounts(newAccounts);
+    localStorage.setItem("bankAccounts", JSON.stringify(newAccounts));
+  }
+  
+  const updateAndStoreTransactions = (newTransactions: Transaction[]) => {
+    setTransactions(newTransactions);
+    localStorage.setItem("transactions", JSON.stringify(newTransactions));
+  }
+
 
   const handleTransaction = (account: BankAccount, type: "receita" | "despesa") => {
     setSelectedAccount(account);
@@ -60,31 +95,50 @@ export default function BancoPage() {
 
   const handleAddAccount = (newAccountData: NewBankAccount) => {
     const newAccount: BankAccount = {
-      id: (Math.random() + 1).toString(36).substring(7), // simple unique id
-      saldo: 0, // Saldo inicial de uma nova conta
+      id: (Math.random() + 1).toString(36).substring(7),
+      saldo: 0,
       ...newAccountData
     };
-    setBankAccounts(currentAccounts => [...currentAccounts, newAccount]);
+    updateAndStoreBankAccounts([...bankAccounts, newAccount]);
     setAddAccountOpen(false);
   }
 
   const handleEditAccount = (editedAccountData: Partial<BankAccount>) => {
     if (!selectedAccount) return;
     
-    setBankAccounts(currentAccounts => 
-        currentAccounts.map(account => 
-            account.id === selectedAccount.id ? { ...account, ...editedAccountData } : account
-        )
+    const updatedAccounts = bankAccounts.map(account => 
+      account.id === selectedAccount.id ? { ...account, ...editedAccountData } : account
     );
+    updateAndStoreBankAccounts(updatedAccounts);
     setEditAccountOpen(false);
   }
   
   const handleDeleteAccount = (accountId: string) => {
-    setBankAccounts(currentAccounts => currentAccounts.filter(account => account.id !== accountId));
+    const updatedAccounts = bankAccounts.filter(account => account.id !== accountId);
+    updateAndStoreBankAccounts(updatedAccounts);
   }
 
-  const handleNewTransaction = () => {
-    // Lógica para adicionar a transação viria aqui
+  const handleNewTransaction = (transactionData: Omit<Transaction, 'id' | 'accountId' | 'type' | 'date'>) => {
+    if(!selectedAccount) return;
+    const newTransaction: Transaction = {
+      id: `T${(Math.random() + 1).toString(36).substring(7)}`,
+      accountId: selectedAccount.id,
+      type: transactionType,
+      date: new Date().toISOString(),
+      ...transactionData,
+    };
+    
+    updateAndStoreTransactions([...transactions, newTransaction]);
+    
+    const updatedAccounts = bankAccounts.map(account => {
+        if(account.id === selectedAccount.id) {
+            const newBalance = transactionType === 'receita' ? account.saldo + newTransaction.amount : account.saldo - newTransaction.amount;
+            return { ...account, saldo: newBalance };
+        }
+        return account;
+    });
+    updateAndStoreBankAccounts(updatedAccounts);
+
     setTransactionOpen(false);
   }
 
@@ -214,7 +268,7 @@ export default function BancoPage() {
                     <TableCell className="font-medium">{account.banco}</TableCell>
                     <TableCell>{account.agencia}</TableCell>
                     <TableCell>{account.conta}</TableCell>
-                    <TableCell className="font-medium text-green-600">
+                    <TableCell className={cn("font-medium", account.saldo >= 0 ? 'text-green-600' : 'text-red-600')}>
                       {account.saldo.toLocaleString("pt-BR", {
                         style: "currency",
                         currency: "BRL",
@@ -307,3 +361,5 @@ export default function BancoPage() {
     </>
   )
 }
+
+    
