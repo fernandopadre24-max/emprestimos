@@ -9,7 +9,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { loans, customers } from "@/lib/data"
-import { format } from "date-fns"
+import { format, addMinutes } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
 export default function EmprestimosPage() {
@@ -34,6 +34,8 @@ export default function EmprestimosPage() {
           <TableBody>
             {loans.map(loan => {
               const customer = customers.find(c => c.id === loan.customerId);
+              const date = new Date(loan.startDate);
+              const timezoneOffset = date.getTimezoneOffset();
               return (
                 <TableRow key={loan.id}>
                   <TableCell>
@@ -45,7 +47,7 @@ export default function EmprestimosPage() {
                   <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                   <TableCell className="hidden md:table-cell">{loan.term} meses</TableCell>
                   <TableCell className="hidden md:table-cell">{(loan.interestRate * 100).toFixed(2)}% a.m.</TableCell>
-                  <TableCell className="hidden sm:table-cell">{format(new Date(loan.startDate), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{format(addMinutes(date, timezoneOffset), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? 'bg-accent text-accent-foreground' : ''}>
                       {loan.status}
