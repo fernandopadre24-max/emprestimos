@@ -96,8 +96,8 @@ export default function EmprestimosPage() {
   }
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
-    if (installment.status === 'Paga' || !installment.dueDate) {
-        return installment.originalAmount;
+    if (installment.status === 'Paga') {
+        return 0; // Se já está paga, não há valor devido.
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -108,7 +108,7 @@ export default function EmprestimosPage() {
     if (today > dueDate) {
         const daysOverdue = differenceInDays(today, dueDate);
         if (daysOverdue > 0) {
-            const lateFeeRate = loan.lateFeeRate || 0.03;
+            const lateFeeRate = loan.lateFeeRate || 0;
             // A multa é calculada sobre o valor restante da parcela
             const lateFee = amountDue * lateFeeRate * daysOverdue;
             return amountDue + lateFee;
@@ -484,3 +484,6 @@ export default function EmprestimosPage() {
     
 
 
+
+
+    
