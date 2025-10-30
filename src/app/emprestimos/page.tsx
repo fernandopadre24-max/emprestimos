@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { loans as initialLoans, customers as initialCustomers, bankAccounts as initialBankAccounts } from "@/lib/data"
+import { loans as initialLoans, customers as initialCustomers, bankAccounts as initialBankAccounts, generateInstallments } from "@/lib/data"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Loan, Customer, Installment, BankAccount, Transaction } from "@/lib/types"
@@ -108,9 +108,17 @@ export default function EmprestimosPage() {
 
   const handleEditLoan = (editedLoanData: Partial<Loan>) => {
     if (!selectedLoan) return;
-    const updatedLoans = loans.map(loan =>
-      loan.id === selectedLoan.id ? { ...loan, ...editedLoanData } : loan
-    );
+
+    const updatedLoans = loans.map(loan => {
+      if (loan.id === selectedLoan.id) {
+        const updatedLoanRaw = { ...loan, ...editedLoanData };
+        // Recalculate installments if core data changed
+        const newInstallments = generateInstallments(updatedLoanRaw);
+        return { ...updatedLoanRaw, installments: newInstallments };
+      }
+      return loan;
+    });
+
     updateAndStoreLoans(updatedLoans);
     setEditDialogOpen(false);
   };
@@ -351,5 +359,3 @@ export default function EmprestimosPage() {
     </>
   )
 }
-
-    

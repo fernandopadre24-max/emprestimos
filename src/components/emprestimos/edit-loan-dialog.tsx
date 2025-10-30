@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -34,17 +35,28 @@ export function EditLoanDialog({
   onSubmit,
   loan,
 }: EditLoanDialogProps) {
+  const [amount, setAmount] = useState(0);
+  const [interestRate, setInterestRate] = useState(0);
+  const [term, setTerm] = useState(0);
   const [status, setStatus] = useState<"Em dia" | "Atrasado" | "Pago">("Em dia");
 
   useEffect(() => {
     if (loan) {
+      setAmount(loan.amount);
+      setInterestRate(loan.interestRate * 100); // convert to percentage for display
+      setTerm(loan.term);
       setStatus(loan.status);
     }
   }, [loan]);
 
   const handleSubmit = () => {
     if (!loan) return;
-    onSubmit({ status });
+    onSubmit({ 
+        amount, 
+        interestRate: interestRate / 100, // convert back to decimal
+        term, 
+        status 
+    });
   };
 
   return (
@@ -53,10 +65,29 @@ export function EditLoanDialog({
         <DialogHeader>
           <DialogTitle>Editar Empréstimo</DialogTitle>
           <DialogDescription>
-            Atualize o status do empréstimo selecionado.
+            Atualize as informações do empréstimo. Alterar os valores irá recalcular as parcelas.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="amount" className="text-right">
+              Valor (R$)
+            </Label>
+            <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(parseFloat(e.target.value))} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="interestRate" className="text-right">
+              Juros (% a.m.)
+            </Label>
+            <Input id="interestRate" type="number" value={interestRate} onChange={(e) => setInterestRate(parseFloat(e.target.value))} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="term" className="text-right">
+              Prazo (meses)
+            </Label>
+            <Input id="term" type="number" value={term} onChange={(e) => setTerm(parseInt(e.target.value, 10))} className="col-span-3" />
+          </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="loan-status" className="text-right">
               Status
@@ -94,5 +125,3 @@ export function EditLoanDialog({
     </Dialog>
   );
 }
-
-    
