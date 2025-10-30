@@ -393,7 +393,7 @@ export default function EmprestimosPage() {
                                                         <TableHead>Vencimento</TableHead>
                                                         <TableHead>Status</TableHead>
                                                         <TableHead>Valor</TableHead>
-                                                        <TableHead className="text-right">Ação</TableHead>
+                                                        <TableHead className="text-right">Pagar</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
@@ -469,5 +469,3 @@ export default function EmprestimosPage() {
     </>
   )
 }
-
-    
