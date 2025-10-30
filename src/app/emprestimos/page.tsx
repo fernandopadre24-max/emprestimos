@@ -85,28 +85,29 @@ export default function EmprestimosPage() {
     localStorage.setItem("transactions", JSON.stringify([...transactions, ...newTransactions]));
   }
 
-  const calculateLateFee = (installment: Installment, loan: Loan): Installment => {
+  const calculateLateFee = (installment: Installment, loan: Loan): number => {
     if (installment.status === 'Paga' || !installment.dueDate) {
-      return installment;
+      return installment.amount;
     }
   
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Ignore time part for comparison
     const dueDate = parseISO(installment.dueDate);
   
+    // This is the original installment amount, without any previous fees.
+    const originalInstallment = generateInstallments(loan).find(i => i.id === installment.id);
+    const originalAmount = originalInstallment ? originalInstallment.amount : installment.amount;
+  
     if (today > dueDate) {
       const daysOverdue = differenceInDays(today, dueDate);
       if (daysOverdue > 0) {
         const lateFeeRate = loan.lateFeeRate || 0.03; // Default to 3% if not defined
-        const lateFee = installment.amount * lateFeeRate * daysOverdue;
-        return {
-          ...installment,
-          amount: installment.amount + lateFee,
-        };
+        const lateFee = originalAmount * lateFeeRate * daysOverdue;
+        return originalAmount + lateFee;
       }
     }
   
-    return installment;
+    return originalAmount;
   };
   
 
@@ -158,7 +159,8 @@ export default function EmprestimosPage() {
   };
 
   const handlePayInstallmentClick = (loan: Loan, installment: Installment) => {
-    const installmentWithFee = calculateLateFee(installment, loan);
+    const paidAmount = calculateLateFee(installment, loan);
+    const installmentWithFee = { ...installment, amount: paidAmount };
     setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
     setCreditDialogOpen(true);
   };
@@ -353,7 +355,7 @@ export default function EmprestimosPage() {
                                                         today.setHours(0,0,0,0);
                                                         const dueDate = parseISO(installment.dueDate);
                                                         const isOverdue = today > dueDate && installment.status === 'Pendente';
-                                                        const installmentWithFee = calculateLateFee(installment, loan);
+                                                        const finalAmount = calculateLateFee(installment, loan);
                                                         const displayStatus = isOverdue ? 'Atrasada' : installment.status;
 
                                                         return (
@@ -366,7 +368,7 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {installmentWithFee.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {finalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                                 {isOverdue && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
