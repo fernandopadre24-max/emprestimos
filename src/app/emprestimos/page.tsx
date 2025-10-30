@@ -105,8 +105,8 @@ export default function EmprestimosPage() {
         const daysOverdue = differenceInDays(today, dueDate);
         if (daysOverdue > 0) {
             const lateFeeRate = loan.lateFeeRate || 0.03;
-            // A multa é calculada sobre o valor original da parcela
-            const lateFee = originalAmount * lateFeeRate * daysOverdue;
+            // A multa é calculada sobre o valor restante da parcela
+            const lateFee = amountDue * lateFeeRate * daysOverdue;
             return amountDue + lateFee;
         }
     }
