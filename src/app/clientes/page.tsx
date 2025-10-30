@@ -1,3 +1,5 @@
+"use client"
+
 import {
   Table,
   TableBody,
@@ -10,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { customers } from "@/lib/data"
 import type { Customer } from "@/lib/types"
-import { format, addMinutes } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
 export default function ClientesPage() {
@@ -33,14 +35,13 @@ export default function ClientesPage() {
           </TableHeader>
           <TableBody>
             {customers.map((customer: Customer) => {
-              const date = new Date(customer.registrationDate);
-              const timezoneOffset = date.getTimezoneOffset();
+              const date = parseISO(customer.registrationDate);
               return (
               <TableRow key={customer.id}>
                 <TableCell className="font-medium">{customer.name}</TableCell>
                 <TableCell className="hidden sm:table-cell">{customer.email}</TableCell>
                 <TableCell className="hidden sm:table-cell">{customer.cpf}</TableCell>
-                <TableCell className="hidden md:table-cell">{format(addMinutes(date, timezoneOffset), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                <TableCell className="hidden md:table-cell">{format(date, "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                 <TableCell className="text-right">
                   <Badge variant={customer.loanStatus === 'Ativo' ? 'secondary' : customer.loanStatus === 'Inadimplente' ? 'destructive' : 'default'} className={customer.loanStatus === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
                     {customer.loanStatus}

@@ -32,14 +32,14 @@ export default function Header() {
       <div className="relative ml-auto flex-1 md:grow-0">
         {/* Can add a search bar here if needed */}
       </div>
-      <Link href="/emprestimos/novo" passHref>
-        <Button size="sm" className="h-8 gap-1">
+      <Button asChild size="sm" className="h-8 gap-1">
+        <Link href="/emprestimos/novo">
           <PlusCircle className="h-3.5 w-3.5" />
           <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
             Novo Empréstimo
           </span>
-        </Button>
-      </Link>
+        </Link>
+      </Button>
       <UserNav />
     </header>
   )
