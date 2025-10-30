@@ -1,4 +1,4 @@
-import { Customer, Loan, ChartData } from '@/lib/types';
+import { Customer, Loan, ChartData, BankData } from '@/lib/types';
 
 export const customers: Customer[] = [
   { id: '1', name: 'João Silva', email: 'joao.silva@example.com', cpf: '123.456.789-01', registrationDate: '2023-01-15', loanStatus: 'Ativo' },
@@ -25,3 +25,9 @@ export const chartData: ChartData[] = [
     { month: "Maio", emprestimos: 209 },
     { month: "Junho", emprestimos: 250 },
 ];
+
+export const bankData: BankData = {
+  totalBalance: 500000,
+  totalWithdrawn: 150000,
+  availableForLoans: 350000,
+};

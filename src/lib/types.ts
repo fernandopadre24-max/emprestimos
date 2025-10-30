@@ -21,3 +21,9 @@ export interface ChartData {
   month: string;
   emprestimos: number;
 }
+
+export interface BankData {
+  totalBalance: number;
+  totalWithdrawn: number;
+  availableForLoans: number;
+}

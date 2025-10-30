@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { Home, Users, Landmark, FileText, Settings } from "lucide-react"
+import { Home, Users, Landmark, FileText, Settings, Banknote } from "lucide-react"
 import { Logo } from "@/components/icons"
 import { cn } from "@/lib/utils"
 
@@ -22,6 +22,7 @@ const MainSidebar = () => {
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/emprestimos", label: "Empréstimos", icon: Landmark },
+    { href: "/banco", label: "Banco", icon: Banknote },
     { href: "/relatorios", label: "Relatórios", icon: FileText },
   ]
 
