@@ -68,8 +68,14 @@ export default function BancoPage() {
     setAddAccountOpen(false);
   }
 
-  const handleEditAccount = () => {
-    // Lógica para editar a conta viria aqui
+  const handleEditAccount = (editedAccountData: Partial<BankAccount>) => {
+    if (!selectedAccount) return;
+    
+    setBankAccounts(currentAccounts => 
+        currentAccounts.map(account => 
+            account.id === selectedAccount.id ? { ...account, ...editedAccountData } : account
+        )
+    );
     setEditAccountOpen(false);
   }
 

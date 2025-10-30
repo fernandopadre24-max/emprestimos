@@ -18,7 +18,7 @@ import { useEffect, useState } from "react"
 interface EditAccountDialogProps {
   isOpen: boolean
   onOpenChange: (isOpen: boolean) => void
-  onSubmit: () => void
+  onSubmit: (data: Partial<BankAccount>) => void
   account: BankAccount | null
 }
 
@@ -34,6 +34,11 @@ export function EditAccountDialog({ isOpen, onOpenChange, onSubmit, account }: E
       setConta(account.conta);
     }
   }, [account]);
+
+  const handleSubmit = () => {
+    if (!account) return;
+    onSubmit({ banco, agencia, conta });
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -66,9 +71,11 @@ export function EditAccountDialog({ isOpen, onOpenChange, onSubmit, account }: E
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="submit" onClick={onSubmit}>Salvar Alterações</Button>
+          <Button type="submit" onClick={handleSubmit}>Salvar Alterações</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
+
+    
