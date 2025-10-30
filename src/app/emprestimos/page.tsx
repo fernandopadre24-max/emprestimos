@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Check, ChevronDown, FilePenLine, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dialog"
+import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 
 export default function EmprestimosPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -29,6 +30,8 @@ export default function EmprestimosPage() {
   const [expandedLoanIds, setExpandedLoanIds] = useState<string[]>([]);
 
   const [isCreditDialogOpen, setCreditDialogOpen] = useState(false);
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<{loanId: string, installment: Installment} | null>(null);
 
 
@@ -98,9 +101,19 @@ export default function EmprestimosPage() {
     updateAndStoreLoans(updatedLoans);
   }
 
-  const handleEditLoan = (loan: Loan) => {
-    console.log("Editing loan:", loan);
+  const handleEditLoanClick = (loan: Loan) => {
+    setSelectedLoan(loan);
+    setEditDialogOpen(true);
   }
+
+  const handleEditLoan = (editedLoanData: Partial<Loan>) => {
+    if (!selectedLoan) return;
+    const updatedLoans = loans.map(loan =>
+      loan.id === selectedLoan.id ? { ...loan, ...editedLoanData } : loan
+    );
+    updateAndStoreLoans(updatedLoans);
+    setEditDialogOpen(false);
+  };
 
   const handlePayInstallmentClick = (loanId: string, installment: Installment) => {
     setPaymentDetails({ loanId, installment });
@@ -264,7 +277,7 @@ export default function EmprestimosPage() {
                                             <TableCell>{format(parseISO(loan.startDate), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); handleEditLoan(loan)}}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); handleEditLoanClick(loan)}}>
                                                         <FilePenLine className="h-4 w-4" />
                                                     </Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDeleteLoan(loan.id)}}>
@@ -328,6 +341,12 @@ export default function EmprestimosPage() {
         onSubmit={handleConfirmPayment}
         paymentDetails={paymentDetails}
         accounts={bankAccounts}
+      />
+      <EditLoanDialog
+        isOpen={isEditDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSubmit={handleEditLoan}
+        loan={selectedLoan}
       />
     </>
   )
