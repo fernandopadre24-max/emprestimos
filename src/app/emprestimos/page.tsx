@@ -22,8 +22,6 @@ import { cn } from "@/lib/utils"
 import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dialog"
 import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 
-const DEFAULT_LATE_FEE_PERCENTAGE = 0.03; // 3% per day
-
 export default function EmprestimosPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -43,8 +41,19 @@ export default function EmprestimosPage() {
     const storedBankAccounts = localStorage.getItem("bankAccounts");
 
     const customersData = storedCustomers ? JSON.parse(storedCustomers) : initialCustomers;
-    const loansData = storedLoans ? JSON.parse(storedLoans) : initialLoans;
+    let loansData = storedLoans ? JSON.parse(storedLoans) : initialLoans;
     const bankAccountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
+
+    // Ensure all loans have installments
+    loansData = loansData.map((loan: Loan) => {
+      if (!loan.installments || loan.installments.length === 0) {
+        return {
+          ...loan,
+          installments: generateInstallments(loan)
+        };
+      }
+      return loan;
+    });
 
     setCustomers(customersData);
     setLoans(loansData);
@@ -88,7 +97,7 @@ export default function EmprestimosPage() {
     if (today > dueDate) {
       const daysOverdue = differenceInDays(today, dueDate);
       if (daysOverdue > 0) {
-        const lateFeeRate = loan.lateFeeRate ?? DEFAULT_LATE_FEE_PERCENTAGE;
+        const lateFeeRate = loan.lateFeeRate || 0.03; // Default to 3% if not defined
         const lateFee = installment.amount * lateFeeRate * daysOverdue;
         return {
           ...installment,
@@ -167,12 +176,13 @@ export default function EmprestimosPage() {
         });
 
         const paidInstallment = newInstallments.find(i => i.id === installmentId);
+        const customer = customers.find(c => c.id === loan.customerId);
 
         if (paidInstallment) {
           const newTransaction: Transaction = {
             id: `T${(Math.random() + 1).toString(36).substring(7)}`,
             accountId: accountId,
-            description: `Pagamento Parcela ${paidInstallment.installmentNumber} - Empréstimo ${loan.id}`,
+            description: `Pagamento Parcela ${paidInstallment.installmentNumber} - ${customer?.name || 'Cliente desconhecido'}`,
             amount: paidInstallment.amount,
             date: new Date().toISOString(),
             type: 'receita',
@@ -400,5 +410,3 @@ export default function EmprestimosPage() {
     </>
   )
 }
-
-    
