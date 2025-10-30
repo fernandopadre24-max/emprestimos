@@ -53,8 +53,8 @@ export default function EmprestimosPage() {
     // Ensure all loans have installments and installments have paidAmount
     loansData = loansData.map((loan: Loan) => {
       const installments = (loan.installments && loan.installments.length > 0)
-        ? loan.installments.map(i => ({ ...i, paidAmount: i.paidAmount || 0 }))
-        : generateInstallments(loan).map(i => ({ ...i, paidAmount: 0 }));
+        ? loan.installments.map(i => ({ ...i, paidAmount: i.paidAmount || 0, originalAmount: i.originalAmount || i.amount }))
+        : generateInstallments(loan).map(i => ({ ...i, paidAmount: 0, originalAmount: i.amount }));
 
       return { ...loan, installments };
     });
@@ -92,7 +92,7 @@ export default function EmprestimosPage() {
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
     if (installment.status === 'Paga' || !installment.dueDate) {
-        return installment.originalAmount;
+        return 0; // Return 0 as there is nothing to be paid
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -203,7 +203,7 @@ export default function EmprestimosPage() {
         if (l.id === loanId) {
             const newInstallments = l.installments.map(i => {
                 if (i.id === installmentId) {
-                    const newPaidAmount = i.paidAmount + amountPaid;
+                    const newPaidAmount = (i.paidAmount || 0) + amountPaid;
                     const isFullyPaid = newPaidAmount >= i.originalAmount;
 
                     return { 
