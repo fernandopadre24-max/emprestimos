@@ -1,3 +1,4 @@
+
 export interface Customer {
   id: string;
   name: string;
@@ -65,6 +66,9 @@ export interface Transaction {
     amount: number;
     date: string;
     type: 'receita' | 'despesa';
+    sourceId?: string; // To link back to the source of the transaction, e.g., a specific loan installment
 }
+
+    
 
     

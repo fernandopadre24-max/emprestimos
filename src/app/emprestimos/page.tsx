@@ -17,15 +17,18 @@ import { format, parseISO, differenceInDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Loan, Customer, Installment, BankAccount, Transaction } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { Check, ChevronDown, FilePenLine, Trash2 } from "lucide-react"
+import { ChevronDown, FilePenLine, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dialog"
 import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
+import { Switch } from "@/components/ui/switch"
 
 export default function EmprestimosPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<string[]>([]);
   const [expandedLoanIds, setExpandedLoanIds] = useState<string[]>([]);
 
@@ -39,10 +42,13 @@ export default function EmprestimosPage() {
     const storedCustomers = localStorage.getItem("customers");
     const storedLoans = localStorage.getItem("loans");
     const storedBankAccounts = localStorage.getItem("bankAccounts");
+    const storedTransactions = localStorage.getItem("transactions");
 
     const customersData = storedCustomers ? JSON.parse(storedCustomers) : initialCustomers;
     let loansData = storedLoans ? JSON.parse(storedLoans) : initialLoans;
     const bankAccountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
+    const transactionsData = storedTransactions ? JSON.parse(storedTransactions) : [];
+
 
     // Ensure all loans have installments
     loansData = loansData.map((loan: Loan) => {
@@ -58,10 +64,12 @@ export default function EmprestimosPage() {
     setCustomers(customersData);
     setLoans(loansData);
     setBankAccounts(bankAccountsData);
+    setTransactions(transactionsData);
 
     if (!storedCustomers) localStorage.setItem("customers", JSON.stringify(customersData));
     if (!storedLoans) localStorage.setItem("loans", JSON.stringify(loansData));
     if (!storedBankAccounts) localStorage.setItem("bankAccounts", JSON.stringify(bankAccountsData));
+    if (!storedTransactions) localStorage.setItem("transactions", JSON.stringify(transactionsData));
   }, []);
 
   const updateAndStoreLoans = (newLoans: Loan[]) => {
@@ -80,9 +88,8 @@ export default function EmprestimosPage() {
   };
   
   const updateAndStoreTransactions = (newTransactions: Transaction[]) => {
-    const storedTransactions = localStorage.getItem("transactions") || "[]";
-    const transactions = JSON.parse(storedTransactions);
-    localStorage.setItem("transactions", JSON.stringify([...transactions, ...newTransactions]));
+    setTransactions(newTransactions);
+    localStorage.setItem("transactions", JSON.stringify(newTransactions));
   }
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
@@ -158,70 +165,111 @@ export default function EmprestimosPage() {
     setEditDialogOpen(false);
   };
 
-  const handlePayInstallmentClick = (loan: Loan, installment: Installment) => {
-    const paidAmount = calculateLateFee(installment, loan);
-    const installmentWithFee = { ...installment, amount: paidAmount };
-    setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
-    setCreditDialogOpen(true);
+  const handlePaymentToggle = (checked: boolean, loan: Loan, installment: Installment) => {
+    if (checked) {
+      // Open dialog to select account for payment
+      const paidAmount = calculateLateFee(installment, loan);
+      const installmentWithFee = { ...installment, amount: paidAmount };
+      setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
+      setCreditDialogOpen(true);
+    } else {
+      // Revert payment
+      handleRevertPayment(loan.id, installment.id);
+    }
   };
   
-
   const handleConfirmPayment = (loanId: string, installmentId: string, accountId: string, paidAmount: number) => {
-    const newLoans = loans.map(loan => {
-      if (loan.id === loanId) {
-        
-        const newInstallments = loan.installments.map(installment => {
-          if (installment.id === installmentId) {
-            return { ...installment, status: 'Paga' as const, amount: paidAmount }; // Save the amount that was actually paid
+    const loan = loans.find(l => l.id === loanId);
+    const installment = loan?.installments.find(i => i.id === installmentId);
+    const customer = customers.find(c => c.id === loan?.customerId);
+
+    if (!loan || !installment || !customer) return;
+
+    const newTransaction: Transaction = {
+      id: `T${(Math.random() + 1).toString(36).substring(7)}`,
+      accountId: accountId,
+      description: `Pagamento Parcela ${installment.installmentNumber} - ${customer.name}`,
+      amount: paidAmount,
+      date: new Date().toISOString(),
+      type: 'receita',
+      sourceId: `loan:${loanId}-installment:${installmentId}`, // Link to the source
+    };
+    
+    // Update transactions
+    const newTransactions = [...transactions, newTransaction];
+    updateAndStoreTransactions(newTransactions);
+
+    // Update bank account balance
+    const newBankAccounts = bankAccounts.map(acc => 
+      acc.id === accountId ? {...acc, saldo: acc.saldo + paidAmount} : acc
+    );
+    updateAndStoreBankAccounts(newBankAccounts);
+    
+    // Update loan and installment status
+    const newLoans = loans.map(l => {
+      if (l.id === loanId) {
+        const newInstallments = l.installments.map(i => {
+          if (i.id === installmentId) {
+            return { ...i, status: 'Paga' as const, amount: paidAmount };
           }
-          return installment;
+          return i;
         });
 
-        const paidInstallment = newInstallments.find(i => i.id === installmentId);
-        const customer = customers.find(c => c.id === loan.customerId);
-
-        if (paidInstallment) {
-          const newTransaction: Transaction = {
-            id: `T${(Math.random() + 1).toString(36).substring(7)}`,
-            accountId: accountId,
-            description: `Pagamento Parcela ${paidInstallment.installmentNumber} - ${customer?.name || 'Cliente desconhecido'}`,
-            amount: paidInstallment.amount,
-            date: new Date().toISOString(),
-            type: 'receita',
-          };
-          updateAndStoreTransactions([newTransaction]);
-
-          const newBankAccounts = bankAccounts.map(acc => 
-            acc.id === accountId ? {...acc, saldo: acc.saldo + paidInstallment!.amount} : acc
-          );
-          updateAndStoreBankAccounts(newBankAccounts);
-        }
-
         const allPaid = newInstallments.every(inst => inst.status === 'Paga');
-        
-        return {
-          ...loan,
-          installments: newInstallments,
-          status: allPaid ? 'Pago' : loan.status,
-        };
+        return { ...l, installments: newInstallments, status: allPaid ? 'Pago' : l.status };
       }
-      return loan;
+      return l;
     });
     updateAndStoreLoans(newLoans);
 
-    // Update customer loan status if all their loans are paid
-    const customerId = newLoans.find(l => l.id === loanId)?.customerId;
-    if(customerId) {
-        const customerLoans = newLoans.filter(l => l.customerId === customerId);
-        const allCustomerLoansPaid = customerLoans.every(l => l.status === 'Pago');
-        if (allCustomerLoansPaid) {
-            const newCustomers = customers.map(c => 
-                c.id === customerId ? {...c, loanStatus: 'Pago'} : c
-            );
-            updateAndStoreCustomers(newCustomers);
-        }
+    // Update customer status if all loans are paid
+    const customerLoans = newLoans.filter(l => l.customerId === customer.id);
+    if (customerLoans.every(l => l.status === 'Pago')) {
+      const newCustomers = customers.map(c => 
+          c.id === customer.id ? {...c, loanStatus: 'Pago'} : c
+      );
+      updateAndStoreCustomers(newCustomers);
     }
+
     setCreditDialogOpen(false);
+  };
+  
+  const handleRevertPayment = (loanId: string, installmentId: string) => {
+    const transactionToRevert = transactions.find(t => t.sourceId === `loan:${loanId}-installment:${installmentId}`);
+
+    if (transactionToRevert) {
+      // Revert bank account balance
+      const newBankAccounts = bankAccounts.map(acc => {
+        if (acc.id === transactionToRevert.accountId) {
+          return {...acc, saldo: acc.saldo - transactionToRevert.amount};
+        }
+        return acc;
+      });
+      updateAndStoreBankAccounts(newBankAccounts);
+
+      // Remove transaction
+      const newTransactions = transactions.filter(t => t.id !== transactionToRevert.id);
+      updateAndStoreTransactions(newTransactions);
+    }
+
+    // Revert installment status and amount
+    const newLoans = loans.map(l => {
+      if (l.id === loanId) {
+        // Find original amount before fees
+        const originalInstallment = generateInstallments(l).find(i => i.id === installmentId);
+
+        const newInstallments = l.installments.map(i => {
+          if (i.id === installmentId) {
+            return { ...i, status: 'Pendente' as const, amount: originalInstallment?.amount || i.amount };
+          }
+          return i;
+        });
+        
+        return { ...l, installments: newInstallments, status: 'Em dia' }; // Reset loan status as well
+      }
+      return l;
+    });
+    updateAndStoreLoans(newLoans);
   };
 
   const toggleCustomer = (customerId: string) => {
@@ -350,7 +398,7 @@ export default function EmprestimosPage() {
                                                 </TableHeader>
                                                 <TableBody>
                                                     {loan.installments.map(installment => {
-                                                        if (!installment.dueDate) return null; // Safety check
+                                                        if (!installment.dueDate) return null;
                                                         const today = new Date();
                                                         today.setHours(0,0,0,0);
                                                         const dueDate = parseISO(installment.dueDate);
@@ -372,9 +420,11 @@ export default function EmprestimosPage() {
                                                                 {isOverdue && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => handlePayInstallmentClick(loan, installment)} disabled={installment.status === 'Paga'}>
-                                                                    <Check className="h-4 w-4" />
-                                                                </Button>
+                                                                <Switch
+                                                                    checked={installment.status === 'Paga'}
+                                                                    onCheckedChange={(checked) => handlePaymentToggle(checked, loan, installment)}
+                                                                    aria-label={`Marcar parcela ${installment.installmentNumber} como paga`}
+                                                                />
                                                             </TableCell>
                                                         </TableRow>
                                                     )})}
@@ -398,7 +448,14 @@ export default function EmprestimosPage() {
     </Card>
       <CreditPaymentDialog 
         isOpen={isCreditDialogOpen}
-        onOpenChange={setCreditDialogOpen}
+        onOpenChange={(isOpen) => {
+            if (!isOpen) {
+                // If user closes dialog without confirming, revert the visual state if needed or reset selection
+                setCreditDialogOpen(false);
+            } else {
+                setCreditDialogOpen(true);
+            }
+        }}
         onSubmit={handleConfirmPayment}
         paymentDetails={paymentDetails}
         accounts={bankAccounts}
@@ -412,3 +469,5 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
+    
