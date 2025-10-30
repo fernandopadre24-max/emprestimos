@@ -15,6 +15,8 @@ export interface Installment {
   loanId: string;
   installmentNumber: number;
   amount: number;
+  originalAmount: number;
+  paidAmount: number;
   dueDate: string;
   status: 'Paga' | 'Pendente';
 }
@@ -68,7 +70,5 @@ export interface Transaction {
     type: 'receita' | 'despesa';
     sourceId?: string; // To link back to the source of the transaction, e.g., a specific loan installment
 }
-
-    
 
     

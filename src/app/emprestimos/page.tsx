@@ -50,15 +50,13 @@ export default function EmprestimosPage() {
     const transactionsData = storedTransactions ? JSON.parse(storedTransactions) : [];
 
 
-    // Ensure all loans have installments
+    // Ensure all loans have installments and installments have paidAmount
     loansData = loansData.map((loan: Loan) => {
-      if (!loan.installments || loan.installments.length === 0) {
-        return {
-          ...loan,
-          installments: generateInstallments(loan)
-        };
-      }
-      return loan;
+      const installments = (loan.installments && loan.installments.length > 0)
+        ? loan.installments.map(i => ({ ...i, paidAmount: i.paidAmount || 0 }))
+        : generateInstallments(loan).map(i => ({ ...i, paidAmount: 0 }));
+
+      return { ...loan, installments };
     });
 
     setCustomers(customersData);
@@ -94,28 +92,26 @@ export default function EmprestimosPage() {
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
     if (installment.status === 'Paga' || !installment.dueDate) {
-      return installment.amount;
+        return installment.originalAmount;
     }
-  
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Ignore time part for comparison
+    today.setHours(0, 0, 0, 0);
     const dueDate = parseISO(installment.dueDate);
-  
-    // This is the original installment amount, without any previous fees.
-    const originalInstallment = generateInstallments(loan).find(i => i.id === installment.id);
-    const originalAmount = originalInstallment ? originalInstallment.amount : installment.amount;
-  
+
+    const originalAmount = installment.originalAmount;
+    const amountDue = originalAmount - installment.paidAmount;
+
     if (today > dueDate) {
-      const daysOverdue = differenceInDays(today, dueDate);
-      if (daysOverdue > 0) {
-        const lateFeeRate = loan.lateFeeRate || 0.03; // Default to 3% if not defined
-        const lateFee = originalAmount * lateFeeRate * daysOverdue;
-        return originalAmount + lateFee;
-      }
+        const daysOverdue = differenceInDays(today, dueDate);
+        if (daysOverdue > 0) {
+            const lateFeeRate = loan.lateFeeRate || 0.03;
+            // A multa é calculada sobre o valor original da parcela
+            const lateFee = originalAmount * lateFeeRate * daysOverdue;
+            return amountDue + lateFee;
+        }
     }
-  
-    return originalAmount;
-  };
+    return amountDue;
+};
   
 
   const customersWithLoans = useMemo(() => {
@@ -168,8 +164,9 @@ export default function EmprestimosPage() {
   const handlePaymentToggle = (checked: boolean, loan: Loan, installment: Installment) => {
     if (checked) {
       // Open dialog to select account for payment
-      const paidAmount = calculateLateFee(installment, loan);
-      const installmentWithFee = { ...installment, amount: paidAmount };
+      const totalDue = calculateLateFee(installment, loan);
+      const lateFee = totalDue - (installment.originalAmount - installment.paidAmount);
+      const installmentWithFee = { ...installment, amount: totalDue, lateFee: lateFee > 0 ? lateFee : 0 };
       setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
       setCreditDialogOpen(true);
     } else {
@@ -178,89 +175,101 @@ export default function EmprestimosPage() {
     }
   };
   
-  const handleConfirmPayment = (loanId: string, installmentId: string, accountId: string, paidAmount: number) => {
+  const handleConfirmPayment = (loanId: string, installmentId: string, accountId: string, amountPaid: number, paymentType: string) => {
     const loan = loans.find(l => l.id === loanId);
-    const installment = loan?.installments.find(i => i.id === installmentId);
     const customer = customers.find(c => c.id === loan?.customerId);
+    if (!loan || !customer) return;
 
-    if (!loan || !installment || !customer) return;
-
+    // Create Transaction
     const newTransaction: Transaction = {
-      id: `T${(Math.random() + 1).toString(36).substring(7)}`,
-      accountId: accountId,
-      description: `Pagamento Parcela ${installment.installmentNumber} - ${customer.name}`,
-      amount: paidAmount,
-      date: new Date().toISOString(),
-      type: 'receita',
-      sourceId: `loan:${loanId}-installment:${installmentId}`, // Link to the source
+        id: `T${(Math.random() + 1).toString(36).substring(7)}`,
+        accountId: accountId,
+        description: `Pagamento Parcela - ${customer.name}`,
+        amount: amountPaid,
+        date: new Date().toISOString(),
+        type: 'receita',
+        sourceId: `loan:${loanId}-installment:${installmentId}`,
     };
+    updateAndStoreTransactions([...transactions, newTransaction]);
     
-    // Update transactions
-    const newTransactions = [...transactions, newTransaction];
-    updateAndStoreTransactions(newTransactions);
-
-    // Update bank account balance
+    // Update Bank Account
     const newBankAccounts = bankAccounts.map(acc => 
-      acc.id === accountId ? {...acc, saldo: acc.saldo + paidAmount} : acc
+        acc.id === accountId ? {...acc, saldo: acc.saldo + amountPaid} : acc
     );
     updateAndStoreBankAccounts(newBankAccounts);
-    
-    // Update loan and installment status
-    const newLoans = loans.map(l => {
-      if (l.id === loanId) {
-        const newInstallments = l.installments.map(i => {
-          if (i.id === installmentId) {
-            return { ...i, status: 'Paga' as const, amount: paidAmount };
-          }
-          return i;
-        });
 
-        const allPaid = newInstallments.every(inst => inst.status === 'Paga');
-        return { ...l, installments: newInstallments, status: allPaid ? 'Pago' : l.status };
-      }
-      return l;
+    // Update Loan Installment
+    const newLoans = loans.map(l => {
+        if (l.id === loanId) {
+            const newInstallments = l.installments.map(i => {
+                if (i.id === installmentId) {
+                    const newPaidAmount = i.paidAmount + amountPaid;
+                    const isFullyPaid = newPaidAmount >= i.originalAmount;
+
+                    return { 
+                        ...i, 
+                        paidAmount: newPaidAmount,
+                        status: isFullyPaid ? 'Paga' as const : 'Pendente' as const,
+                        // Reset amount to original, paidAmount tracks payments
+                        amount: i.originalAmount
+                    };
+                }
+                return i;
+            });
+            const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
+            return { ...l, installments: newInstallments, status: allInstallmentsPaid ? 'Pago' : 'Em dia' };
+        }
+        return l;
     });
     updateAndStoreLoans(newLoans);
 
-    // Update customer status if all loans are paid
+    // Update customer status
     const customerLoans = newLoans.filter(l => l.customerId === customer.id);
     if (customerLoans.every(l => l.status === 'Pago')) {
-      const newCustomers = customers.map(c => 
-          c.id === customer.id ? {...c, loanStatus: 'Pago'} : c
-      );
-      updateAndStoreCustomers(newCustomers);
+        updateAndStoreCustomers(customers.map(c => c.id === customer.id ? {...c, loanStatus: 'Pago'} : c));
+    } else {
+        updateAndStoreCustomers(customers.map(c => c.id === customer.id ? {...c, loanStatus: 'Ativo'} : c));
     }
 
     setCreditDialogOpen(false);
-  };
+};
+
   
   const handleRevertPayment = (loanId: string, installmentId: string) => {
-    const transactionToRevert = transactions.find(t => t.sourceId === `loan:${loanId}-installment:${installmentId}`);
+    // Find all transactions for this installment
+    const transactionsToRevert = transactions.filter(t => t.sourceId === `loan:${loanId}-installment:${installmentId}`);
+    
+    if (transactionsToRevert.length > 0) {
+      let totalRevertedAmount = 0;
+      const accountReversions = new Map<string, number>();
 
-    if (transactionToRevert) {
-      // Revert bank account balance
+      transactionsToRevert.forEach(t => {
+        totalRevertedAmount += t.amount;
+        accountReversions.set(t.accountId, (accountReversions.get(t.accountId) || 0) + t.amount);
+      });
+
+      // Revert bank account balances
       const newBankAccounts = bankAccounts.map(acc => {
-        if (acc.id === transactionToRevert.accountId) {
-          return {...acc, saldo: acc.saldo - transactionToRevert.amount};
+        if (accountReversions.has(acc.id)) {
+          return {...acc, saldo: acc.saldo - (accountReversions.get(acc.id) || 0)};
         }
         return acc;
       });
       updateAndStoreBankAccounts(newBankAccounts);
 
-      // Remove transaction
-      const newTransactions = transactions.filter(t => t.id !== transactionToRevert.id);
+      // Remove transactions
+      const transactionIdsToRevert = new Set(transactionsToRevert.map(t => t.id));
+      const newTransactions = transactions.filter(t => !transactionIdsToRevert.has(t.id));
       updateAndStoreTransactions(newTransactions);
     }
+
 
     // Revert installment status and amount
     const newLoans = loans.map(l => {
       if (l.id === loanId) {
-        // Find original amount before fees
-        const originalInstallment = generateInstallments(l).find(i => i.id === installmentId);
-
         const newInstallments = l.installments.map(i => {
           if (i.id === installmentId) {
-            return { ...i, status: 'Pendente' as const, amount: originalInstallment?.amount || i.amount };
+            return { ...i, status: 'Pendente' as const, paidAmount: 0 };
           }
           return i;
         });
@@ -392,7 +401,7 @@ export default function EmprestimosPage() {
                                                         <TableHead>Nº</TableHead>
                                                         <TableHead>Vencimento</TableHead>
                                                         <TableHead>Status</TableHead>
-                                                        <TableHead>Valor</TableHead>
+                                                        <TableHead>Valor Devido</TableHead>
                                                         <TableHead className="text-right">Pagar</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
@@ -403,8 +412,8 @@ export default function EmprestimosPage() {
                                                         today.setHours(0,0,0,0);
                                                         const dueDate = parseISO(installment.dueDate);
                                                         const isOverdue = today > dueDate && installment.status === 'Pendente';
-                                                        const finalAmount = calculateLateFee(installment, loan);
-                                                        const displayStatus = isOverdue ? 'Atrasada' : installment.status;
+                                                        const finalAmountDue = calculateLateFee(installment, loan);
+                                                        const displayStatus = installment.status === 'Pendente' && isOverdue ? 'Atrasada' : installment.status;
 
                                                         return (
                                                         <TableRow key={installment.id}>
@@ -416,14 +425,15 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {finalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                                {isOverdue && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
+                                                                {finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {isOverdue && installment.status !== 'Paga' && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <Switch
                                                                     checked={installment.status === 'Paga'}
                                                                     onCheckedChange={(checked) => handlePaymentToggle(checked, loan, installment)}
                                                                     aria-label={`Marcar parcela ${installment.installmentNumber} como paga`}
+                                                                    disabled={installment.status === 'Paga'}
                                                                 />
                                                             </TableCell>
                                                         </TableRow>
@@ -448,14 +458,7 @@ export default function EmprestimosPage() {
     </Card>
       <CreditPaymentDialog 
         isOpen={isCreditDialogOpen}
-        onOpenChange={(isOpen) => {
-            if (!isOpen) {
-                // If user closes dialog without confirming, revert the visual state if needed or reset selection
-                setCreditDialogOpen(false);
-            } else {
-                setCreditDialogOpen(true);
-            }
-        }}
+        onOpenChange={setCreditDialogOpen}
         onSubmit={handleConfirmPayment}
         paymentDetails={paymentDetails}
         accounts={bankAccounts}
@@ -469,3 +472,5 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
+    

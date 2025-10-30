@@ -29,6 +29,8 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
             loanId: loan.id,
             installmentNumber: i,
             amount: monthlyPayment,
+            originalAmount: monthlyPayment,
+            paidAmount: 0,
             dueDate: formatISO(dueDate),
             status: 'Pendente'
         });
@@ -85,6 +87,5 @@ export const transactions: Transaction[] = [
     { id: 'T4', accountId: '1', description: 'Freela', amount: 800, date: '2024-07-10', type: 'receita' },
     { id: 'T5', accountId: '1', description: 'Conta de Luz', amount: 120.50, date: '2024-07-12', type: 'despesa' },
 ];
-    
 
     
