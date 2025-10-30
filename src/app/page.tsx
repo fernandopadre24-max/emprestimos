@@ -28,7 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { loans, customers, chartData } from "@/lib/data"
 import type { ChartConfig } from "@/components/ui/chart"
-import { format, addMinutes } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
 const chartConfig = {
@@ -148,8 +148,7 @@ export default function Dashboard() {
               </TableHeader>
               <TableBody>
                 {loans.slice(0, 5).map(loan => {
-                   const date = new Date(loan.startDate);
-                   const timezoneOffset = date.getTimezoneOffset();
+                   const date = parseISO(loan.startDate);
                   return (
                   <TableRow key={loan.id}>
                     <TableCell>
@@ -160,7 +159,7 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {format(addMinutes(date, timezoneOffset), 'dd/MM/yyyy', { locale: ptBR })}
+                      {format(date, 'dd/MM/yyyy', { locale: ptBR })}
                     </TableCell>
                     <TableCell className="text-right">
                        <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
@@ -181,7 +180,6 @@ export default function Dashboard() {
           <CardContent className="pl-2">
              <ChartContainer config={chartConfig} className="w-full h-[300px]">
               <BarChart accessibilityLayer data={chartData}>
-                <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="month"
                   tickLine={false}
@@ -190,6 +188,7 @@ export default function Dashboard() {
                   tickFormatter={(value) => value.slice(0, 3)}
                 />
                 <YAxis />
+                <CartesianGrid vertical={false} />
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent indicator="dot" />}
