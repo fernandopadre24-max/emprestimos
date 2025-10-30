@@ -1,4 +1,3 @@
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   Card,
   CardContent,
@@ -11,6 +10,11 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from "@/components/ui/chart"
 import {
   Table,
@@ -153,7 +157,7 @@ export default function Dashboard() {
                       {new Date(loan.startDate).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="text-right">
-                       <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className="bg-accent text-accent-foreground">
+                       <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
                         {loan.status}
                        </Badge>
                     </TableCell>
