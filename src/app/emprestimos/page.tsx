@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useMemo, useEffect } from "react"
@@ -98,8 +99,7 @@ export default function EmprestimosPage() {
     today.setHours(0, 0, 0, 0);
     const dueDate = parseISO(installment.dueDate);
 
-    const originalAmount = installment.originalAmount;
-    const amountDue = originalAmount - installment.paidAmount;
+    const amountDue = installment.originalAmount - installment.paidAmount;
 
     if (today > dueDate) {
         const daysOverdue = differenceInDays(today, dueDate);
@@ -210,8 +210,6 @@ export default function EmprestimosPage() {
                         ...i, 
                         paidAmount: newPaidAmount,
                         status: isFullyPaid ? 'Paga' as const : 'Pendente' as const,
-                        // Reset amount to original, paidAmount tracks payments
-                        amount: i.originalAmount
                     };
                 }
                 return i;
@@ -472,5 +470,7 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
+    
 
     
