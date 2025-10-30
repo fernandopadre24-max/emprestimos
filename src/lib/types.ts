@@ -1,4 +1,5 @@
 
+
 export interface Customer {
   id: string;
   name: string;
@@ -23,6 +24,7 @@ export interface Installment {
 
 export interface Loan {
   id: string;
+  loanCode: string;
   customerId: string;
   amount: number;
   interestRate: number;

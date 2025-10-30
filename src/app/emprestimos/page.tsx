@@ -1,5 +1,6 @@
 
 
+
 "use client"
 
 import React, { useState, useMemo, useEffect } from "react"
@@ -353,6 +354,7 @@ export default function EmprestimosPage() {
                                       <TableHeader>
                                          <TableRow>
                                             <TableHead className="w-12"></TableHead>
+                                            <TableHead>Código</TableHead>
                                             <TableHead>Valor</TableHead>
                                             <TableHead>Prazo</TableHead>
                                             <TableHead>Parcelas Restantes</TableHead>
@@ -368,6 +370,7 @@ export default function EmprestimosPage() {
                                                     <ChevronDown className={cn("h-4 w-4 transition-transform", isLoanExpanded && "rotate-180")} />
                                                 </Button>
                                             </TableCell>
+                                            <TableCell className="font-mono">{loan.loanCode}</TableCell>
                                             <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                             <TableCell>{loan.term} meses</TableCell>
                                             <TableCell>{remainingInstallments}</TableCell>

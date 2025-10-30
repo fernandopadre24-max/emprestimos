@@ -1,5 +1,6 @@
 
 
+
 import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount, Transaction, Installment } from '@/lib/types';
 import { addMonths, formatISO } from 'date-fns';
 
@@ -40,12 +41,12 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
 
 
 const initialLoans: Omit<Loan, 'installments'>[] = [
-  { id: 'L1', customerId: '1', amount: 10000, interestRate: 0.05, term: 24, lateFeeRate: 0.03, startDate: '2023-01-20', status: 'Em dia' },
-  { id: 'L2', customerId: '2', amount: 5000, interestRate: 0.08, term: 12, lateFeeRate: 0.03, startDate: '2023-02-25', status: 'Pago' },
-  { id: 'L3', customerId: '3', amount: 15000, interestRate: 0.06, term: 36, lateFeeRate: 0.03, startDate: '2023-03-15', status: 'Em dia' },
-  { id: 'L4', customerId: '4', amount: 7500, interestRate: 0.1, term: 18, lateFeeRate: 0.03, startDate: '2023-04-10', status: 'Atrasado' },
-  { id: 'L5', customerId: '5', amount: 20000, interestRate: 0.04, term: 48, lateFeeRate: 0.03, startDate: '2023-05-30', status: 'Em dia' },
-  { id: 'L6', customerId: '1', amount: 2000, interestRate: 0.09, term: 6, lateFeeRate: 0.03, startDate: '2024-06-10', status: 'Em dia' },
+  { id: 'L1', loanCode: 'CS-001', customerId: '1', amount: 10000, interestRate: 0.05, term: 24, lateFeeRate: 0.03, startDate: '2023-01-20', status: 'Em dia' },
+  { id: 'L2', loanCode: 'CS-002', customerId: '2', amount: 5000, interestRate: 0.08, term: 12, lateFeeRate: 0.03, startDate: '2023-02-25', status: 'Pago' },
+  { id: 'L3', loanCode: 'CS-003', customerId: '3', amount: 15000, interestRate: 0.06, term: 36, lateFeeRate: 0.03, startDate: '2023-03-15', status: 'Em dia' },
+  { id: 'L4', loanCode: 'CS-004', customerId: '4', amount: 7500, interestRate: 0.1, term: 18, lateFeeRate: 0.03, startDate: '2023-04-10', status: 'Atrasado' },
+  { id: 'L5', loanCode: 'CS-005', customerId: '5', amount: 20000, interestRate: 0.04, term: 48, lateFeeRate: 0.03, startDate: '2023-05-30', status: 'Em dia' },
+  { id: 'L6', loanCode: 'CS-006', customerId: '1', amount: 2000, interestRate: 0.09, term: 6, lateFeeRate: 0.03, startDate: '2024-06-10', status: 'Em dia' },
 ];
 
 export const loans: Loan[] = initialLoans.map(loan => ({

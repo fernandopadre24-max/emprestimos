@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -104,6 +105,9 @@ export default function LoanForm() {
     const storedLoans = localStorage.getItem("loans");
     let loans: Loan[] = storedLoans ? JSON.parse(storedLoans) : [];
 
+    const nextLoanNumber = (loans.length || 0) + 1;
+    const newLoanCode = `CS-${nextLoanNumber.toString().padStart(3, '0')}`;
+
     const customer = customers.find(c => c.id === values.customerId);
     
     if (!customer) {
@@ -117,6 +121,7 @@ export default function LoanForm() {
     
     const newLoanRaw: Omit<Loan, 'installments'> = {
         id: `L${(Math.random() + 1).toString(36).substring(7)}`,
+        loanCode: newLoanCode,
         customerId: customer.id,
         amount: values.amount,
         interestRate: values.interestRate / 100, // Store as decimal

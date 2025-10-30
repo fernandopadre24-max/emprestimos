@@ -1,3 +1,4 @@
+
 "use client"
 
 import {
@@ -161,6 +162,7 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead className="hidden md:table-cell">Data</TableHead>
                   <TableHead className="text-right">Status</TableHead>
@@ -178,6 +180,7 @@ export default function Dashboard() {
                          {customer?.email}
                       </div>
                     </TableCell>
+                    <TableCell className="font-mono">{loan.loanCode}</TableCell>
                     <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                     <TableCell className="hidden md:table-cell">
                       {format(date, "dd/MM/yyyy", { locale: ptBR })}
