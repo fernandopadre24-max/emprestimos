@@ -29,6 +29,7 @@ import { bankAccounts, bankSummary, transactions } from "@/lib/data"
 import type { BankAccount, Transaction } from "@/lib/types"
 
 import { AddAccountDialog } from "@/components/banco/add-account-dialog"
+import { EditAccountDialog } from "@/components/banco/edit-account-dialog"
 import { NewTransactionDialog } from "@/components/banco/new-transaction-dialog"
 import { Badge } from "@/components/ui/badge"
 import { format, parseISO } from "date-fns"
@@ -37,6 +38,7 @@ import { cn } from "@/lib/utils"
 
 export default function BancoPage() {
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
+  const [isEditAccountOpen, setEditAccountOpen] = useState(false);
   const [isTransactionOpen, setTransactionOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
@@ -48,9 +50,19 @@ export default function BancoPage() {
     setTransactionOpen(true);
   }
 
+  const handleEditAccountClick = (account: BankAccount) => {
+    setSelectedAccount(account);
+    setEditAccountOpen(true);
+  }
+
   const handleAddAccount = () => {
     // Lógica para adicionar a conta viria aqui
     setAddAccountOpen(false);
+  }
+
+  const handleEditAccount = () => {
+    // Lógica para editar a conta viria aqui
+    setEditAccountOpen(false);
   }
 
   const handleNewTransaction = () => {
@@ -201,7 +213,7 @@ export default function BancoPage() {
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                           <ArrowRightLeft className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditAccountClick(account)}>
                           <FilePenLine className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600">
@@ -254,6 +266,13 @@ export default function BancoPage() {
         isOpen={isAddAccountOpen}
         onOpenChange={setAddAccountOpen}
         onSubmit={handleAddAccount}
+      />
+      
+      <EditAccountDialog
+        isOpen={isEditAccountOpen}
+        onOpenChange={setEditAccountOpen}
+        onSubmit={handleEditAccount}
+        account={selectedAccount}
       />
 
       <NewTransactionDialog
