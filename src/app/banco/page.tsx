@@ -1,66 +1,178 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, TrendingDown, TrendingUp } from "lucide-react";
-import { bankData } from "@/lib/data";
+
+"use client"
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { bankAccounts, bankSummary } from "@/lib/data"
+import type { BankAccount } from "@/lib/types"
+import { Button } from "@/components/ui/button"
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  ChevronDown,
+  CircleDollarSign,
+  CreditCard,
+  Trash2,
+  FilePenLine,
+  ArrowRightLeft,
+  Settings,
+  Plus,
+} from "lucide-react"
 
 export default function BancoPage() {
   return (
-    <div className="grid gap-6">
+    <div className="flex flex-col gap-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">Bancos</h1>
+          <p className="text-muted-foreground">Controle Financeiro</p>
+        </div>
+        <div className="flex gap-2">
+            <Button variant="outline">
+                <Settings className="mr-2 h-4 w-4" />
+                Gerenciar Categorias
+            </Button>
+            <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar Conta
+            </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-green-100/50 border-green-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-800">
+              Receitas
+            </CardTitle>
+            <ArrowUpCircle className="h-5 w-5 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-headline text-green-800">
+              {bankSummary.receitas.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+            </div>
+            <p className="text-xs text-green-700">
+              Total de entradas do período
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="bg-red-100/50 border-red-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-800">
+              Despesas
+            </CardTitle>
+            <ArrowDownCircle className="h-5 w-5 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-headline text-red-800">
+              {bankSummary.despesas.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+            </div>
+            <p className="text-xs text-red-700">Total de saídas do período</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-100/50 border-blue-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-800">
+              Balanço do Período
+            </CardTitle>
+            <CircleDollarSign className="h-5 w-5 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-headline text-blue-800">
+              {bankSummary.balanco.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+            </div>
+            <p className="text-xs text-blue-700">Receitas - Despesas</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-purple-100/50 border-purple-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-purple-800">
+              Saldo em Contas
+            </CardTitle>
+            <CreditCard className="h-5 w-5 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-headline text-purple-800">
+              {bankSummary.saldoContas.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+            </div>
+            <p className="text-xs text-purple-700">Soma dos saldos bancários</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
-        <CardHeader>
-          <CardTitle className="font-headline">Gestão de Caixa do Banco</CardTitle>
-          <CardDescription>
-            Visualize o fluxo de caixa e os fundos disponíveis para empréstimos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Saldo Total
-                </CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-headline">
-                  {bankData.totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  O valor total em caixa.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Retirado</CardTitle>
-                <TrendingDown className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-headline">
-                  {bankData.totalWithdrawn.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Soma de todos os empréstimos concedidos.
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-primary">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Disponível para Empréstimos</CardTitle>
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-headline text-primary">
-                  {bankData.availableForLoans.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Saldo restante para novas operações.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12"></TableHead>
+              <TableHead>Banco</TableHead>
+              <TableHead>Agência</TableHead>
+              <TableHead>Conta</TableHead>
+              <TableHead>Saldo</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {bankAccounts.map((account: BankAccount) => (
+              <TableRow key={account.id}>
+                <TableCell>
+                  <ChevronDown className="h-4 w-4" />
+                </TableCell>
+                <TableCell className="font-medium">{account.banco}</TableCell>
+                <TableCell>{account.agencia}</TableCell>
+                <TableCell>{account.conta}</TableCell>
+                <TableCell className="font-medium text-green-600">
+                  {account.saldo.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600">
+                      <ArrowUpCircle className="h-4 w-4" />
+                    </Button>
+                     <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600">
+                      <ArrowDownCircle className="h-4 w-4" />
+                    </Button>
+                     <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <ArrowRightLeft className="h-4 w-4" />
+                    </Button>
+                     <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <FilePenLine className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </Card>
     </div>
-  );
+  )
 }
+
+    

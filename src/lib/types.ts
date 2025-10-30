@@ -1,3 +1,4 @@
+
 export interface Customer {
   id: string;
   name: string;
@@ -27,3 +28,20 @@ export interface BankData {
   totalWithdrawn: number;
   availableForLoans: number;
 }
+
+export interface BankSummary {
+    receitas: number;
+    despesas: number;
+    balanco: number;
+    saldoContas: number;
+}
+
+export interface BankAccount {
+    id: string;
+    banco: string;
+    agencia: string;
+    conta: string;
+    saldo: number;
+}
+
+    

@@ -1,4 +1,5 @@
-import { Customer, Loan, ChartData, BankData } from '@/lib/types';
+
+import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount } from '@/lib/types';
 
 export const customers: Customer[] = [
   { id: '1', name: 'João Silva', email: 'joao.silva@example.com', cpf: '123.456.789-01', registrationDate: '2023-01-15', loanStatus: 'Ativo' },
@@ -31,3 +32,16 @@ export const bankData: BankData = {
   totalWithdrawn: 150000,
   availableForLoans: 350000,
 };
+
+export const bankSummary: BankSummary = {
+  receitas: 3578.00,
+  despesas: 2283.65,
+  balanco: 1294.35,
+  saldoContas: 935.06,
+};
+
+export const bankAccounts: BankAccount[] = [
+  { id: '1', banco: 'NUBANK', agencia: '0001', conta: '4512558-0', saldo: 935.06 },
+];
+
+    
