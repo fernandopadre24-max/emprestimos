@@ -40,10 +40,10 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function Dashboard() {
-  const [isClient, setIsClient] = useState(false);
+  const [isClient, setIsClient] = useState(false)
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    setIsClient(true)
+  }, [])
 
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
   const totalCustomers = customers.length
@@ -154,7 +154,6 @@ export default function Dashboard() {
               </TableHeader>
               <TableBody>
                 {loans.slice(0, 5).map(loan => {
-                  const date = parseISO(loan.startDate);
                   return (
                   <TableRow key={loan.id}>
                     <TableCell>
@@ -165,7 +164,7 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {isClient ? format(date, "dd/MM/yyyy", { locale: ptBR }) : ''}
+                      {isClient ? format(parseISO(loan.startDate), "dd/MM/yyyy", { locale: ptBR }) : ''}
                     </TableCell>
                     <TableCell className="text-right">
                        <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
@@ -184,24 +183,26 @@ export default function Dashboard() {
             <CardDescription>Janeiro - Junho 2024</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-             {isClient && <ChartContainer config={chartConfig} className="w-full h-[300px]">
-              <BarChart accessibilityLayer data={chartData}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  tickFormatter={(value) => value.slice(0, 3)}
-                />
-                <YAxis />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dot" />}
-                />
-                <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={8} />
-              </BarChart>
-            </ChartContainer>}
+            {isClient && (
+              <ChartContainer config={chartConfig} className="w-full h-[300px]">
+                <BarChart accessibilityLayer data={chartData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    tickMargin={10}
+                    axisLine={false}
+                    tickFormatter={(value) => value.slice(0, 3)}
+                  />
+                  <YAxis />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dot" />}
+                  />
+                  <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={8} />
+                </BarChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
       </div>
