@@ -26,7 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { loans, customers, chartData } from "@/lib/data"
+import { loans as initialLoans, customers as initialCustomers, chartData } from "@/lib/data"
+import type { Loan, Customer } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -40,14 +41,27 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function Dashboard() {
-  const [isClient, setIsClient] = useState(false)
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
   useEffect(() => {
-    setIsClient(true)
-  }, [])
+    const storedLoans = localStorage.getItem("loans");
+    const storedCustomers = localStorage.getItem("customers");
+
+    setLoans(storedLoans ? JSON.parse(storedLoans) : initialLoans);
+    setCustomers(storedCustomers ? JSON.parse(storedCustomers) : initialCustomers);
+  }, []);
 
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
   const totalCustomers = customers.length
-  const profitability = totalValue * 0.12; // Mock profitability
+  const profitability = loans.reduce((acc, loan) => {
+    const totalPaid = loan.installments
+      .filter(i => i.status === 'Paga')
+      .reduce((sum, i) => sum + i.amount, 0);
+    return acc + (totalPaid > loan.amount ? totalPaid - loan.amount : 0);
+  }, 0);
+  const recentLoans = loans.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 5);
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -76,7 +90,7 @@ export default function Dashboard() {
               {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              +20.1% em relação ao mês passado
+              Total de {loans.length} empréstimos concedidos.
             </p>
           </CardContent>
         </Card>
@@ -102,7 +116,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-2xl font-bold font-headline">+{totalCustomers}</div>
             <p className="text-xs text-muted-foreground">
-              +5 desde o último mês
+              Total de clientes cadastrados.
             </p>
           </CardContent>
         </Card>
@@ -129,7 +143,7 @@ export default function Dashboard() {
               {profitability.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Estimativa para o período atual
+              Lucro total dos juros pagos.
             </p>
           </CardContent>
         </Card>
@@ -139,7 +153,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="font-headline">Empréstimos Recentes</CardTitle>
             <CardDescription>
-              Você tem {loans.length} empréstimos no total.
+              Os 5 empréstimos mais recentes.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -153,19 +167,20 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loans.slice(0, 5).map(loan => {
+                {recentLoans.map(loan => {
                   const date = parseISO(loan.startDate);
+                  const customer = customers.find(c => c.id === loan.customerId);
                   return (
                   <TableRow key={loan.id}>
                     <TableCell>
-                      <div className="font-medium">{customers.find(c => c.id === loan.customerId)?.name}</div>
+                      <div className="font-medium">{customer?.name}</div>
                       <div className="hidden text-sm text-muted-foreground md:inline">
-                         {customers.find(c => c.id === loan.customerId)?.email}
+                         {customer?.email}
                       </div>
                     </TableCell>
                     <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {isClient ? format(date, "dd/MM/yyyy", { locale: ptBR }) : ''}
+                      {format(date, "dd/MM/yyyy", { locale: ptBR })}
                     </TableCell>
                     <TableCell className="text-right">
                        <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
@@ -184,7 +199,6 @@ export default function Dashboard() {
             <CardDescription>Janeiro - Junho 2024</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            {isClient && (
               <ChartContainer config={chartConfig} className="w-full h-[300px]">
                 <BarChart accessibilityLayer data={chartData}>
                   <CartesianGrid vertical={false} />
@@ -203,7 +217,6 @@ export default function Dashboard() {
                   <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={8} />
                 </BarChart>
               </ChartContainer>
-            )}
           </CardContent>
         </Card>
       </div>

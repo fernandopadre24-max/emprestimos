@@ -39,7 +39,12 @@ import { cn } from "@/lib/utils"
 export default function BancoPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [bankSummary, setBankSummary] = useState(initialBankSummary);
+  const [bankSummary, setBankSummary] = useState({
+    receitas: 0,
+    despesas: 0,
+    balanco: 0,
+    saldoContas: 0
+  });
 
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
   const [isEditAccountOpen, setEditAccountOpen] = useState(false);
@@ -63,10 +68,19 @@ export default function BancoPage() {
   }, []);
 
   useEffect(() => {
+    // Recalculate summary whenever accounts or transactions change
     const saldoContas = bankAccounts.reduce((acc, account) => acc + account.saldo, 0);
-    const receitas = transactions.filter(t => t.type === 'receita').reduce((acc, t) => acc + t.amount, 0);
-    const despesas = transactions.filter(t => t.type === 'despesa').reduce((acc, t) => acc + t.amount, 0);
+    
+    const receitas = transactions
+      .filter(t => t.type === 'receita')
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const despesas = transactions
+      .filter(t => t.type === 'despesa')
+      .reduce((acc, t) => acc + t.amount, 0);
+
     const balanco = receitas - despesas;
+    
     setBankSummary({ saldoContas, receitas, despesas, balanco });
   }, [bankAccounts, transactions]);
 
@@ -361,5 +375,3 @@ export default function BancoPage() {
     </>
   )
 }
-
-    
