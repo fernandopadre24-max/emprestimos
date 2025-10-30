@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { loans as initialLoans, customers as initialCustomers, bankAccounts as initialBankAccounts, generateInstallments } from "@/lib/data"
+import { loans as initialLoans, customers as initialCustomers, bankAccounts as initialBankAccounts, transactions as initialTransactions, generateInstallments } from "@/lib/data"
 import { format, parseISO, differenceInDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Loan, Customer, Installment, BankAccount, Transaction } from "@/lib/types"
@@ -46,7 +46,7 @@ export default function EmprestimosPage() {
     const storedTransactions = localStorage.getItem("transactions");
 
     const customersData = storedCustomers ? JSON.parse(storedCustomers) : initialCustomers;
-    let loansData = storedLoans ? JSON.parse(storedLoans) : initialLoans;
+    let loansData: Loan[] = storedLoans ? JSON.parse(storedLoans) : initialLoans;
     const bankAccountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
     const transactionsData = storedTransactions ? JSON.parse(storedTransactions) : [];
 
@@ -54,7 +54,11 @@ export default function EmprestimosPage() {
     // Ensure all loans have installments and installments have paidAmount
     loansData = loansData.map((loan: Loan) => {
       const installments = (loan.installments && loan.installments.length > 0)
-        ? loan.installments.map(i => ({ ...i, paidAmount: i.paidAmount || 0, originalAmount: i.originalAmount || i.amount }))
+        ? loan.installments.map(i => ({ 
+            ...i, 
+            paidAmount: i.paidAmount || 0, 
+            originalAmount: i.originalAmount || i.amount 
+          }))
         : generateInstallments(loan).map(i => ({ ...i, paidAmount: 0, originalAmount: i.amount }));
 
       return { ...loan, installments };
@@ -93,7 +97,7 @@ export default function EmprestimosPage() {
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
     if (installment.status === 'Paga' || !installment.dueDate) {
-        return 0; // Return 0 as there is nothing to be paid
+        return installment.originalAmount;
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -478,4 +482,5 @@ export default function EmprestimosPage() {
     
 
     
+
 
