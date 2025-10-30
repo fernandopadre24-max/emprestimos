@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,11 +24,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import type { Customer, Loan, Installment } from "@/lib/types";
 import { generateInstallments } from "@/lib/data";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { customers as initialCustomers } from "@/lib/data";
+
 
 const formSchema = z.object({
-  name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
-  email: z.string().email("Por favor, insira um email válido."),
-  cpf: z.string().min(11, "O CPF deve ter 11 dígitos.").max(14, "Formato de CPF inválido."),
+  customerId: z.string({ required_error: "Por favor, selecione um cliente." }),
   amount: z.coerce.number().min(1, "O valor deve ser maior que zero."),
   interestRate: z.coerce.number().min(0, "A taxa de juros não pode ser negativa."),
   term: z.coerce.number().int().min(1, "O prazo deve ser de pelo menos 1 mês."),
@@ -45,13 +46,21 @@ export default function LoanForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [simulation, setSimulation] = useState<Simulation | null>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    const storedCustomers = localStorage.getItem("customers");
+    if (storedCustomers) {
+      setCustomers(JSON.parse(storedCustomers));
+    } else {
+      setCustomers(initialCustomers);
+      localStorage.setItem("customers", JSON.stringify(initialCustomers));
+    }
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      email: "",
-      cpf: "",
       amount: 1000,
       interestRate: 5,
       term: 12,
@@ -84,25 +93,18 @@ export default function LoanForm() {
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    const storedCustomers = localStorage.getItem("customers");
     const storedLoans = localStorage.getItem("loans");
-    
-    let customers: Customer[] = storedCustomers ? JSON.parse(storedCustomers) : [];
     let loans: Loan[] = storedLoans ? JSON.parse(storedLoans) : [];
 
-    let customer = customers.find(c => c.cpf === values.cpf);
+    const customer = customers.find(c => c.id === values.customerId);
     
     if (!customer) {
-        customer = {
-            id: (Math.random() + 1).toString(36).substring(7),
-            name: values.name,
-            email: values.email,
-            cpf: values.cpf,
-            registrationDate: new Date().toISOString(),
-            loanStatus: 'Ativo'
-        };
-        customers.push(customer);
-        localStorage.setItem("customers", JSON.stringify(customers));
+        toast({
+          variant: "destructive",
+          title: "Erro ao criar empréstimo",
+          description: "Cliente selecionado não foi encontrado.",
+        });
+        return;
     }
     
     const newLoanRaw: Omit<Loan, 'installments'> = {
@@ -140,46 +142,34 @@ export default function LoanForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-8">
         <div className="space-y-6">
-          <h3 className="text-lg font-medium font-headline">Informações Pessoais</h3>
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nome Completo</FormLabel>
-                <FormControl>
-                  <Input placeholder="João da Silva" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="joao.silva@email.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="cpf"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>CPF</FormLabel>
-                <FormControl>
-                  <Input placeholder="123.456.789-00" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <h3 className="text-lg font-medium font-headline">Informações do Cliente</h3>
+            <FormField
+              control={form.control}
+              name="customerId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cliente</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um cliente" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {customers.map(customer => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name} ({customer.cpf})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Selecione o cliente para o qual o empréstimo será concedido.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
           <h3 className="text-lg font-medium font-headline pt-4">Detalhes do Empréstimo</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
