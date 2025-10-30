@@ -77,5 +77,3 @@ export function EditAccountDialog({ isOpen, onOpenChange, onSubmit, account }: E
     </Dialog>
   )
 }
-
-    

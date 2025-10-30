@@ -71,5 +71,3 @@ export function AddAccountDialog({ isOpen, onOpenChange, onSubmit }: AddAccountD
     </Dialog>
   )
 }
-
-    
