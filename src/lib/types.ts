@@ -1,4 +1,5 @@
 
+
 export interface Customer {
   id: string;
   name: string;
@@ -44,4 +45,12 @@ export interface BankAccount {
     saldo: number;
 }
 
+export interface Transaction {
+    id: string;
+    accountId: string;
+    description: string;
+    amount: number;
+    date: string;
+    type: 'receita' | 'despesa';
+}
     

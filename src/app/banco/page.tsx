@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import {
   Table,
   TableBody,
@@ -25,17 +25,22 @@ import {
   Plus,
 } from "lucide-react"
 
-import { bankAccounts, bankSummary } from "@/lib/data"
-import type { BankAccount } from "@/lib/types"
+import { bankAccounts, bankSummary, transactions } from "@/lib/data"
+import type { BankAccount, Transaction } from "@/lib/types"
 
 import { AddAccountDialog } from "@/components/banco/add-account-dialog"
 import { NewTransactionDialog } from "@/components/banco/new-transaction-dialog"
+import { Badge } from "@/components/ui/badge"
+import { format, parseISO } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { cn } from "@/lib/utils"
 
 export default function BancoPage() {
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
   const [isTransactionOpen, setTransactionOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
+  const [expandedRows, setExpandedRows] = useState<string[]>([]);
 
   const handleTransaction = (account: BankAccount, type: "receita" | "despesa") => {
     setSelectedAccount(account);
@@ -44,13 +49,19 @@ export default function BancoPage() {
   }
 
   const handleAddAccount = () => {
-     // Lógica para adicionar a conta viria aqui
+    // Lógica para adicionar a conta viria aqui
     setAddAccountOpen(false);
   }
 
   const handleNewTransaction = () => {
     // Lógica para adicionar a transação viria aqui
     setTransactionOpen(false);
+  }
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(current =>
+      current.includes(id) ? current.filter(rowId => rowId !== id) : [...current, id]
+    );
   }
 
   return (
@@ -159,41 +170,81 @@ export default function BancoPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bankAccounts.map((account: BankAccount) => (
-                <TableRow key={account.id}>
-                  <TableCell>
-                    <ChevronDown className="h-4 w-4" />
-                  </TableCell>
-                  <TableCell className="font-medium">{account.banco}</TableCell>
-                  <TableCell>{account.agencia}</TableCell>
-                  <TableCell>{account.conta}</TableCell>
-                  <TableCell className="font-medium text-green-600">
-                    {account.saldo.toLocaleString("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    })}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600" onClick={() => handleTransaction(account, 'receita')}>
-                        <ArrowUpCircle className="h-4 w-4" />
+              {bankAccounts.map((account: BankAccount) => {
+                const isExpanded = expandedRows.includes(account.id);
+                const accountTransactions = transactions.filter(t => t.accountId === account.id);
+                return (
+                <React.Fragment key={account.id}>
+                  <TableRow>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => toggleRow(account.id)} className="h-8 w-8">
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
                       </Button>
-                       <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleTransaction(account, 'despesa')}>
-                        <ArrowDownCircle className="h-4 w-4" />
-                      </Button>
-                       <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <ArrowRightLeft className="h-4 w-4" />
-                      </Button>
-                       <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <FilePenLine className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="font-medium">{account.banco}</TableCell>
+                    <TableCell>{account.agencia}</TableCell>
+                    <TableCell>{account.conta}</TableCell>
+                    <TableCell className="font-medium text-green-600">
+                      {account.saldo.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600" onClick={() => handleTransaction(account, 'receita')}>
+                          <ArrowUpCircle className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleTransaction(account, 'despesa')}>
+                          <ArrowDownCircle className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <ArrowRightLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <FilePenLine className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && (
+                     <TableRow>
+                        <TableCell colSpan={6}>
+                          <div className="p-4 bg-muted/50 rounded-md">
+                            <h4 className="font-bold mb-2">Transações Recentes</h4>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Data</TableHead>
+                                        <TableHead>Descrição</TableHead>
+                                        <TableHead>Tipo</TableHead>
+                                        <TableHead className="text-right">Valor</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {accountTransactions.map((tx: Transaction) => (
+                                        <TableRow key={tx.id}>
+                                            <TableCell>{format(parseISO(tx.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                                            <TableCell>{tx.description}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={tx.type === 'receita' ? 'secondary' : 'destructive'} className={tx.type === 'receita' ? "bg-green-200 text-green-800" : ""}>{tx.type}</Badge>
+                                            </TableCell>
+                                            <TableCell className={cn("text-right font-medium", tx.type === 'receita' ? 'text-green-600' : 'text-red-600')}>
+                                                {tx.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL"})}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                          </div>
+                        </TableCell>
+                     </TableRow>
+                  )}
+                </React.Fragment>
+              )})}
             </TableBody>
           </Table>
         </Card>
