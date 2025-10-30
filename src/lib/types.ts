@@ -9,6 +9,14 @@ export interface Customer {
 
 export type NewCustomer = Omit<Customer, 'id' | 'registrationDate' | 'loanStatus'>;
 
+export interface Installment {
+  id: string;
+  loanId: string;
+  installmentNumber: number;
+  amount: number;
+  status: 'Paga' | 'Pendente';
+}
+
 export interface Loan {
   id: string;
   customerId: string;
@@ -17,7 +25,7 @@ export interface Loan {
   term: number; // in months
   startDate: string;
   status: 'Em dia' | 'Atrasado' | 'Pago';
-  remainingInstallments?: number;
+  installments: Installment[];
 }
 
 export interface ChartData {
