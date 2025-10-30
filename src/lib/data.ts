@@ -1,6 +1,7 @@
 
 
 import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount, Transaction, Installment } from '@/lib/types';
+import { addMonths, formatISO } from 'date-fns';
 
 export const customers: Customer[] = [
   { id: '1', name: 'João Silva', email: 'joao.silva@example.com', cpf: '123.456.789-01', registrationDate: '2023-01-15', loanStatus: 'Ativo' },
@@ -15,8 +16,8 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
     const principal = loan.amount;
     const monthlyRate = loan.interestRate;
     const numberOfMonths = loan.term;
+    const startDate = new Date(loan.startDate);
     
-    // Using PMT formula for monthly payment calculation
     const monthlyPayment = monthlyRate > 0 
       ? (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfMonths)) / (Math.pow(1 + monthlyRate, numberOfMonths) - 1)
       : principal / numberOfMonths;
@@ -25,19 +26,19 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
     if (loan.status === 'Pago') {
         paidCount = loan.term;
     } else if (loan.status === 'Em dia') {
-        // This is a simplification. A real app would check payment dates.
-        const startDate = new Date(loan.startDate);
         const today = new Date();
         const monthsPassed = (today.getFullYear() - startDate.getFullYear()) * 12 + (today.getMonth() - startDate.getMonth());
         paidCount = Math.max(0, monthsPassed);
     }
     
     for (let i = 1; i <= loan.term; i++) {
+        const dueDate = addMonths(startDate, i);
         installments.push({
             id: `${loan.id}-I${i}`,
             loanId: loan.id,
             installmentNumber: i,
             amount: monthlyPayment,
+            dueDate: formatISO(dueDate),
             status: i <= paidCount ? 'Paga' : 'Pendente'
         });
     }

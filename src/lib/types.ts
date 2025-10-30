@@ -14,6 +14,7 @@ export interface Installment {
   loanId: string;
   installmentNumber: number;
   amount: number;
+  dueDate: string;
   status: 'Paga' | 'Pendente';
 }
 

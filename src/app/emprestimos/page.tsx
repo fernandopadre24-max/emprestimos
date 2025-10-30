@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { loans as initialLoans, customers as initialCustomers, bankAccounts as initialBankAccounts, generateInstallments } from "@/lib/data"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, differenceInDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Loan, Customer, Installment, BankAccount, Transaction } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,8 @@ import { Check, ChevronDown, FilePenLine, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dialog"
 import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
+
+const LATE_FEE_PERCENTAGE = 0.03; // 3% per day
 
 export default function EmprestimosPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -75,6 +77,29 @@ export default function EmprestimosPage() {
     localStorage.setItem("transactions", JSON.stringify([...transactions, ...newTransactions]));
   }
 
+  const calculateLateFee = (installment: Installment): Installment => {
+    if (installment.status === 'Paga') {
+      return installment;
+    }
+  
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Ignore time part for comparison
+    const dueDate = parseISO(installment.dueDate);
+  
+    if (today > dueDate) {
+      const daysOverdue = differenceInDays(today, dueDate);
+      if (daysOverdue > 0) {
+        const lateFee = installment.amount * LATE_FEE_PERCENTAGE * daysOverdue;
+        return {
+          ...installment,
+          amount: installment.amount + lateFee,
+        };
+      }
+    }
+  
+    return installment;
+  };
+  
 
   const customersWithLoans = useMemo(() => {
     if (!loans || !customers) return [];
@@ -124,22 +149,24 @@ export default function EmprestimosPage() {
   };
 
   const handlePayInstallmentClick = (loanId: string, installment: Installment) => {
-    setPaymentDetails({ loanId, installment });
+    const installmentWithFee = calculateLateFee(installment);
+    setPaymentDetails({ loanId, installment: installmentWithFee });
     setCreditDialogOpen(true);
   };
   
 
-  const handleConfirmPayment = (loanId: string, installmentId: string, accountId: string) => {
+  const handleConfirmPayment = (loanId: string, installmentId: string, accountId: string, paidAmount: number) => {
     const newLoans = loans.map(loan => {
       if (loan.id === loanId) {
-        let paidInstallment: Installment | undefined;
+        
         const newInstallments = loan.installments.map(installment => {
           if (installment.id === installmentId) {
-            paidInstallment = { ...installment, status: 'Paga' as const };
-            return paidInstallment;
+            return { ...installment, status: 'Paga' as const, amount: paidAmount }; // Save the amount that was actually paid
           }
           return installment;
         });
+
+        const paidInstallment = newInstallments.find(i => i.id === installmentId);
 
         if (paidInstallment) {
           const newTransaction: Transaction = {
@@ -303,20 +330,33 @@ export default function EmprestimosPage() {
                                                 <TableHeader>
                                                     <TableRow>
                                                         <TableHead>Nº</TableHead>
-                                                        <TableHead>Valor</TableHead>
+                                                        <TableHead>Vencimento</TableHead>
                                                         <TableHead>Status</TableHead>
+                                                        <TableHead>Valor</TableHead>
                                                         <TableHead className="text-right">Ação</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
-                                                    {loan.installments.map(installment => (
+                                                    {loan.installments.map(installment => {
+                                                        const today = new Date();
+                                                        today.setHours(0,0,0,0);
+                                                        const dueDate = parseISO(installment.dueDate);
+                                                        const isOverdue = today > dueDate && installment.status === 'Pendente';
+                                                        const installmentWithFee = calculateLateFee(installment);
+                                                        const displayStatus = isOverdue ? 'Atrasada' : installment.status;
+
+                                                        return (
                                                         <TableRow key={installment.id}>
                                                             <TableCell>{installment.installmentNumber}</TableCell>
-                                                            <TableCell>{installment.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                                            <TableCell>{format(dueDate, "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                                                             <TableCell>
-                                                                <Badge variant={installment.status === 'Paga' ? 'secondary' : 'outline'} className={installment.status === 'Paga' ? 'bg-green-200 text-green-800' : ''}>
-                                                                    {installment.status}
+                                                                <Badge variant={displayStatus === 'Paga' ? 'secondary' : displayStatus === 'Atrasada' ? 'destructive' : 'outline'} className={cn(displayStatus === 'Paga' && 'bg-green-200 text-green-800')}>
+                                                                    {displayStatus}
                                                                 </Badge>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {installmentWithFee.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {isOverdue && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => handlePayInstallmentClick(loan.id, installment)} disabled={installment.status === 'Paga'}>
@@ -324,7 +364,7 @@ export default function EmprestimosPage() {
                                                                 </Button>
                                                             </TableCell>
                                                         </TableRow>
-                                                    ))}
+                                                    )})}
                                                 </TableBody>
                                             </Table>
                                         </div>

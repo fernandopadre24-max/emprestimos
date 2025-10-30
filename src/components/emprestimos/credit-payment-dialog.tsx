@@ -24,7 +24,7 @@ import { useState, useEffect } from "react";
 interface CreditPaymentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSubmit: (loanId: string, installmentId: string, accountId: string) => void;
+  onSubmit: (loanId: string, installmentId: string, accountId: string, paidAmount: number) => void;
   paymentDetails: { loanId: string; installment: Installment } | null;
   accounts: BankAccount[];
 }
@@ -39,17 +39,18 @@ export function CreditPaymentDialog({
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
 
   useEffect(() => {
-    if (accounts.length > 0) {
+    if (accounts.length > 0 && !selectedAccountId) {
       setSelectedAccountId(accounts[0].id);
     }
-  }, [accounts]);
+  }, [accounts, selectedAccountId]);
 
   const handleSubmit = () => {
     if (!paymentDetails || !selectedAccountId) return;
     onSubmit(
       paymentDetails.loanId,
       paymentDetails.installment.id,
-      selectedAccountId
+      selectedAccountId,
+      paymentDetails.installment.amount // Pass the amount to be paid
     );
   };
 
@@ -113,5 +114,3 @@ export function CreditPaymentDialog({
     </Dialog>
   );
 }
-
-    
