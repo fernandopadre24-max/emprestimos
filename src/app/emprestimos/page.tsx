@@ -96,26 +96,24 @@ export default function EmprestimosPage() {
   }
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
-    if (installment.status === 'Paga') {
-        return 0; // Se já está paga, não há valor devido.
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dueDate = parseISO(installment.dueDate);
-
-    const amountDue = (installment.originalAmount || installment.amount) - (installment.paidAmount || 0);
-
-    if (today > dueDate) {
-        const daysOverdue = differenceInDays(today, dueDate);
-        if (daysOverdue > 0) {
-            const lateFeeRate = loan.lateFeeRate || 0;
-            // A multa é calculada sobre o valor restante da parcela
-            const lateFee = amountDue * lateFeeRate * daysOverdue;
-            return amountDue + lateFee;
-        }
-    }
-    return amountDue;
-};
+      const amountDue = (installment.originalAmount || installment.amount) - (installment.paidAmount || 0);
+      if (installment.status === 'Paga' || amountDue <= 0) {
+          return 0; 
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = parseISO(installment.dueDate);
+  
+      if (today > dueDate) {
+          const daysOverdue = differenceInDays(today, dueDate);
+          if (daysOverdue > 0) {
+              const lateFeeRate = loan.lateFeeRate || 0;
+              const lateFee = amountDue * lateFeeRate * daysOverdue;
+              return amountDue + lateFee;
+          }
+      }
+      return amountDue;
+  };
   
 
   const customersWithLoans = useMemo(() => {
@@ -433,7 +431,7 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {finalAmountDue > 0 ? finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : (0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                                 {isOverdue && installment.status !== 'Paga' && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
