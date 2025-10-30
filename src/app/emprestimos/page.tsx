@@ -16,11 +16,18 @@ import { format, parseISO, differenceInMonths } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Loan, Customer } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, FilePenLine, Trash2 } from "lucide-react"
+import { Check, ChevronDown, FilePenLine, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function EmprestimosPage() {
-  const [loans, setLoans] = useState<Loan[]>(initialLoans);
+  const [loans, setLoans] = useState<Loan[]>(initialLoans.map(loan => {
+    const startDate = parseISO(loan.startDate);
+    const today = new Date();
+    const monthsPassed = differenceInMonths(today, startDate);
+    const remainingInstallments = Math.max(0, loan.term - monthsPassed);
+    return { ...loan, remainingInstallments };
+  }));
+
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<string[]>([]);
 
@@ -34,14 +41,7 @@ export default function EmprestimosPage() {
             loans: []
           };
         }
-        
-        // Calculate remaining installments
-        const startDate = parseISO(loan.startDate);
-        const today = new Date();
-        const monthsPassed = differenceInMonths(today, startDate);
-        const remainingInstallments = Math.max(0, loan.term - monthsPassed);
-
-        acc[customer.id].loans.push({ ...loan, remainingInstallments });
+        acc[customer.id].loans.push(loan);
       }
       return acc;
     }, {} as Record<string, Customer & { loans: Loan[] }>);
@@ -57,6 +57,23 @@ export default function EmprestimosPage() {
     console.log("Editing loan:", loan);
     // Placeholder for edit functionality
   }
+
+  const handlePayInstallment = (loanId: string) => {
+    setLoans(currentLoans =>
+      currentLoans.map(loan => {
+        if (loan.id === loanId && loan.remainingInstallments && loan.remainingInstallments > 0) {
+          const newRemainingInstallments = loan.remainingInstallments - 1;
+          return {
+            ...loan,
+            remainingInstallments: newRemainingInstallments,
+            status: newRemainingInstallments === 0 ? 'Pago' : loan.status,
+          };
+        }
+        return loan;
+      })
+    );
+  };
+
 
   const toggleCustomer = (customerId: string) => {
     setExpandedCustomerIds(current =>
@@ -138,6 +155,9 @@ export default function EmprestimosPage() {
                                   <TableCell>{format(parseISO(loan.startDate), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-2">
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => handlePayInstallment(loan.id)} disabled={loan.remainingInstallments === 0}>
+                                        <Check className="h-4 w-4" />
+                                      </Button>
                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditLoan(loan)}>
                                         <FilePenLine className="h-4 w-4" />
                                       </Button>
