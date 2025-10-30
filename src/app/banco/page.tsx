@@ -170,21 +170,28 @@ export default function BancoPage() {
     const oldTransaction = transactions.find(t => t.id === selectedTransaction.id);
     if (!oldTransaction) return;
 
+    // Prevent direct editing of loan-related transactions for now
+    if (oldTransaction.sourceId?.startsWith('loan:')) {
+        alert("Não é possível editar transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
+        setEditTransactionOpen(false);
+        return;
+    }
+
     const updatedTransactions = transactions.map(t =>
       t.id === selectedTransaction.id ? { ...t, ...editedTransactionData } : t
     );
     updateAndStoreTransactions(updatedTransactions);
 
     // Adjust account balance
-    const valueDifference = (editedTransactionData.amount || oldTransaction.amount) - oldTransaction.amount;
+    const amountDifference = (editedTransactionData.amount ?? oldTransaction.amount) - oldTransaction.amount;
 
     const updatedAccounts = bankAccounts.map(account => {
       if (account.id === oldTransaction.accountId) {
         let newBalance = account.saldo;
         if (oldTransaction.type === 'receita') {
-            newBalance += valueDifference;
+            newBalance += amountDifference;
         } else { // despesa
-            newBalance -= valueDifference;
+            newBalance -= amountDifference;
         }
         return { ...account, saldo: newBalance };
       }
@@ -199,6 +206,12 @@ export default function BancoPage() {
   const handleDeleteTransaction = (transactionId: string) => {
     const transactionToDelete = transactions.find(t => t.id === transactionId);
     if (!transactionToDelete) return;
+
+    // Prevent direct deletion of loan-related transactions
+    if (transactionToDelete.sourceId?.startsWith('loan:')) {
+        alert("Não é possível excluir transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
+        return;
+    }
 
     // Revert balance change
     const updatedAccounts = bankAccounts.map(account => {
@@ -330,7 +343,9 @@ export default function BancoPage() {
             <TableBody>
               {bankAccounts.map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
-                const accountTransactions = transactions.filter(t => t.accountId === account.id);
+                const accountTransactions = transactions
+                  .filter(t => t.accountId === account.id)
+                  .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
                 return (
                 <React.Fragment key={account.id}>
                   <TableRow>

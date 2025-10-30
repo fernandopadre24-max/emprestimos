@@ -57,11 +57,11 @@ export function CreditPaymentDialog({
     
     let amountToPay = 0;
     if (paymentType === 'total') {
-        amountToPay = paymentDetails.installment.amount;
+        amountToPay = totalAmountDue;
     } else if (paymentType === 'partial') {
         amountToPay = partialAmount;
     } else if (paymentType === 'interest') {
-        amountToPay = paymentDetails.installment.lateFee || 0;
+        amountToPay = lateFee;
     }
 
     if (amountToPay <= 0) return; // Prevent paying zero or negative
@@ -77,7 +77,8 @@ export function CreditPaymentDialog({
 
   const totalAmountDue = paymentDetails?.installment.amount || 0;
   const lateFee = paymentDetails?.installment.lateFee || 0;
-  
+  const remainingPrincipal = (paymentDetails?.installment.originalAmount || 0) - (paymentDetails?.installment.paidAmount || 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -129,6 +130,7 @@ export function CreditPaymentDialog({
                 className="col-span-3"
                 value={partialAmount}
                 onChange={(e) => setPartialAmount(parseFloat(e.target.value))}
+                max={totalAmountDue}
                 />
             </div>
           )}
@@ -166,7 +168,7 @@ export function CreditPaymentDialog({
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={!selectedAccountId}
+            disabled={!selectedAccountId || (paymentType === 'partial' && (partialAmount <= 0 || partialAmount > totalAmountDue))}
           >
             Confirmar Pagamento
           </Button>
@@ -175,5 +177,3 @@ export function CreditPaymentDialog({
     </Dialog>
   );
 }
-
-    

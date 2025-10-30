@@ -1,6 +1,5 @@
 
 
-
 "use client"
 
 import React, { useState, useMemo, useEffect } from "react"
@@ -100,7 +99,7 @@ export default function EmprestimosPage() {
     today.setHours(0, 0, 0, 0);
     const dueDate = parseISO(installment.dueDate);
 
-    const amountDue = installment.originalAmount - installment.paidAmount;
+    const amountDue = installment.originalAmount - (installment.paidAmount || 0);
 
     if (today > dueDate) {
         const daysOverdue = differenceInDays(today, dueDate);
@@ -166,7 +165,7 @@ export default function EmprestimosPage() {
     if (checked) {
       // Open dialog to select account for payment
       const totalDue = calculateLateFee(installment, loan);
-      const lateFee = totalDue - (installment.originalAmount - installment.paidAmount);
+      const lateFee = totalDue - (installment.originalAmount - (installment.paidAmount || 0));
       const installmentWithFee = { ...installment, amount: totalDue, lateFee: lateFee > 0 ? lateFee : 0 };
       setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
       setCreditDialogOpen(true);
@@ -181,11 +180,14 @@ export default function EmprestimosPage() {
     const customer = customers.find(c => c.id === loan?.customerId);
     if (!loan || !customer) return;
 
+    const installment = loan.installments.find(i => i.id === installmentId);
+    if (!installment) return;
+
     // Create Transaction
     const newTransaction: Transaction = {
         id: `T${(Math.random() + 1).toString(36).substring(7)}`,
         accountId: accountId,
-        description: `Pagamento Parcela - ${customer.name}`,
+        description: `Pgto. Parc. ${installment.installmentNumber}/${loan.term} - ${loan.loanCode} - ${customer.name}`,
         amount: amountPaid,
         date: new Date().toISOString(),
         type: 'receita',
@@ -434,7 +436,6 @@ export default function EmprestimosPage() {
                                                                     checked={installment.status === 'Paga'}
                                                                     onCheckedChange={(checked) => handlePaymentToggle(checked, loan, installment)}
                                                                     aria-label={`Marcar parcela ${installment.installmentNumber} como paga`}
-                                                                    disabled={installment.status === 'Paga'}
                                                                 />
                                                             </TableCell>
                                                         </TableRow>
@@ -477,3 +478,4 @@ export default function EmprestimosPage() {
     
 
     
+
