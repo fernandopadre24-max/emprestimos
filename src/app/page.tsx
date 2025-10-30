@@ -30,6 +30,7 @@ import { loans, customers, chartData } from "@/lib/data"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { useState, useEffect } from "react"
 
 const chartConfig = {
   emprestimos: {
@@ -39,6 +40,11 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function Dashboard() {
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
   const totalCustomers = customers.length
   const profitability = totalValue * 0.12; // Mock profitability
@@ -159,7 +165,7 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {format(date, "dd/MM/yyyy", { locale: ptBR })}
+                      {isClient ? format(date, "dd/MM/yyyy", { locale: ptBR }) : ''}
                     </TableCell>
                     <TableCell className="text-right">
                        <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
@@ -178,7 +184,7 @@ export default function Dashboard() {
             <CardDescription>Janeiro - Junho 2024</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-             <ChartContainer config={chartConfig} className="w-full h-[300px]">
+             {isClient && <ChartContainer config={chartConfig} className="w-full h-[300px]">
               <BarChart accessibilityLayer data={chartData}>
                 <CartesianGrid vertical={false} />
                 <XAxis
@@ -195,7 +201,7 @@ export default function Dashboard() {
                 />
                 <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={8} />
               </BarChart>
-            </ChartContainer>
+            </ChartContainer>}
           </CardContent>
         </Card>
       </div>
