@@ -1,6 +1,7 @@
+
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import {
   Table,
   TableBody,
@@ -11,7 +12,6 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { customers as initialCustomers } from "@/lib/data"
 import type { Customer } from "@/lib/types"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -19,21 +19,37 @@ import { Button } from "@/components/ui/button"
 import { FilePenLine, Plus, Trash2 } from "lucide-react"
 import { AddCustomerDialog } from "@/components/clientes/add-customer-dialog"
 import { EditCustomerDialog } from "@/components/clientes/edit-customer-dialog"
+import { customers as initialCustomers } from "@/lib/data"
 
 export default function ClientesPage() {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
+  useEffect(() => {
+    const storedCustomers = localStorage.getItem("customers");
+    if (storedCustomers) {
+      setCustomers(JSON.parse(storedCustomers));
+    } else {
+      setCustomers(initialCustomers);
+      localStorage.setItem("customers", JSON.stringify(initialCustomers));
+    }
+  }, []);
+
+  const updateAndStoreCustomers = (newCustomers: Customer[]) => {
+    setCustomers(newCustomers);
+    localStorage.setItem("customers", JSON.stringify(newCustomers));
+  }
+
   const handleAddCustomer = (newCustomerData: Omit<Customer, 'id' | 'registrationDate' | 'loanStatus'>) => {
     const newCustomer: Customer = {
-      id: (customers.length + 1).toString(),
+      id: (Math.random() + 1).toString(36).substring(7),
       registrationDate: new Date().toISOString(),
       loanStatus: 'Ativo',
       ...newCustomerData
     };
-    setCustomers(current => [...current, newCustomer]);
+    updateAndStoreCustomers([...customers, newCustomer]);
     setAddDialogOpen(false);
   }
 
@@ -44,16 +60,16 @@ export default function ClientesPage() {
   
   const handleEditCustomer = (editedCustomerData: Partial<Customer>) => {
     if (!selectedCustomer) return;
-    setCustomers(current => 
-        current.map(customer => 
-            customer.id === selectedCustomer.id ? { ...customer, ...editedCustomerData } : customer
-        )
+    const updatedCustomers = customers.map(customer => 
+      customer.id === selectedCustomer.id ? { ...customer, ...editedCustomerData } : customer
     );
+    updateAndStoreCustomers(updatedCustomers);
     setEditDialogOpen(false);
   }
 
   const handleDeleteCustomer = (customerId: string) => {
-    setCustomers(current => current.filter(customer => customer.id !== customerId));
+    const updatedCustomers = customers.filter(customer => customer.id !== customerId);
+    updateAndStoreCustomers(updatedCustomers);
   }
 
 

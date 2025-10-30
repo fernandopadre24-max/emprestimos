@@ -1,9 +1,12 @@
+
 "use client";
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { useRouter } from "next/navigation";
+
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import type { Customer, Loan, Installment } from "@/lib/types";
+import { generateInstallments } from "@/lib/data";
 
 const formSchema = z.object({
   name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
@@ -37,6 +42,7 @@ interface Simulation {
 
 export default function LoanForm() {
   const { toast } = useToast();
+  const router = useRouter();
   const [simulation, setSimulation] = useState<Simulation | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -76,14 +82,55 @@ export default function LoanForm() {
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
+    const storedCustomers = localStorage.getItem("customers");
+    const storedLoans = localStorage.getItem("loans");
+    
+    let customers: Customer[] = storedCustomers ? JSON.parse(storedCustomers) : [];
+    let loans: Loan[] = storedLoans ? JSON.parse(storedLoans) : [];
+
+    let customer = customers.find(c => c.cpf === values.cpf);
+    
+    if (!customer) {
+        customer = {
+            id: (Math.random() + 1).toString(36).substring(7),
+            name: values.name,
+            email: values.email,
+            cpf: values.cpf,
+            registrationDate: new Date().toISOString(),
+            loanStatus: 'Ativo'
+        };
+        customers.push(customer);
+        localStorage.setItem("customers", JSON.stringify(customers));
+    }
+    
+    const newLoanRaw: Omit<Loan, 'installments'> = {
+        id: `L${(Math.random() + 1).toString(36).substring(7)}`,
+        customerId: customer.id,
+        amount: values.amount,
+        interestRate: values.interestRate / 100, // Store as decimal
+        term: values.term,
+        startDate: new Date().toISOString(),
+        status: 'Em dia',
+    };
+
+    const newLoan: Loan = {
+      ...newLoanRaw,
+      installments: generateInstallments(newLoanRaw)
+    }
+
+    loans.push(newLoan);
+    localStorage.setItem("loans", JSON.stringify(loans));
+
     toast({
       title: "Solicitação Enviada!",
       description: "Sua solicitação de empréstimo foi enviada com sucesso.",
       className: "bg-accent text-accent-foreground"
     });
+    
     form.reset();
     setSimulation(null);
+
+    router.push("/emprestimos");
   }
 
   return (

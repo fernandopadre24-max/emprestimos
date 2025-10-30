@@ -1,6 +1,7 @@
+
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import {
   Table,
   TableBody,
@@ -12,7 +13,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { loans as initialLoans, customers as initialCustomers } from "@/lib/data"
-import { format, parseISO, addMonths } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import type { Loan, Customer, Installment } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -20,12 +21,39 @@ import { Check, ChevronDown, FilePenLine, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function EmprestimosPage() {
-  const [loans, setLoans] = useState<Loan[]>(initialLoans);
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<string[]>([]);
   const [expandedLoanIds, setExpandedLoanIds] = useState<string[]>([]);
 
+  useEffect(() => {
+    const storedCustomers = localStorage.getItem("customers");
+    const storedLoans = localStorage.getItem("loans");
+
+    const customersData = storedCustomers ? JSON.parse(storedCustomers) : initialCustomers;
+    const loansData = storedLoans ? JSON.parse(storedLoans) : initialLoans;
+
+    setCustomers(customersData);
+    setLoans(loansData);
+
+    if (!storedCustomers) localStorage.setItem("customers", JSON.stringify(customersData));
+    if (!storedLoans) localStorage.setItem("loans", JSON.stringify(loansData));
+  }, []);
+
+  const updateAndStoreLoans = (newLoans: Loan[]) => {
+    setLoans(newLoans);
+    localStorage.setItem("loans", JSON.stringify(newLoans));
+  }
+  
+  const updateAndStoreCustomers = (newCustomers: Customer[]) => {
+    setCustomers(newCustomers);
+    localStorage.setItem("customers", JSON.stringify(newCustomers));
+  }
+
+
   const customersWithLoans = useMemo(() => {
+    if (!loans || !customers) return [];
+    
     const customerLoanMap = loans.reduce((acc, loan) => {
       const customer = customers.find(c => c.id === loan.customerId);
       if (customer) {
@@ -44,7 +72,8 @@ export default function EmprestimosPage() {
   }, [loans, customers]);
 
   const handleDeleteLoan = (loanId: string) => {
-    setLoans(currentLoans => currentLoans.filter(loan => loan.id !== loanId));
+    const updatedLoans = loans.filter(loan => loan.id !== loanId);
+    updateAndStoreLoans(updatedLoans);
   }
 
   const handleEditLoan = (loan: Loan) => {
@@ -52,27 +81,39 @@ export default function EmprestimosPage() {
   }
 
   const handlePayInstallment = (loanId: string, installmentId: string) => {
-    setLoans(currentLoans =>
-      currentLoans.map(loan => {
-        if (loan.id === loanId) {
-          const newInstallments = loan.installments.map(installment => {
-            if (installment.id === installmentId) {
-              return { ...installment, status: 'Paga' as const };
-            }
-            return installment;
-          });
+    const newLoans = loans.map(loan => {
+      if (loan.id === loanId) {
+        const newInstallments = loan.installments.map(installment => {
+          if (installment.id === installmentId) {
+            return { ...installment, status: 'Paga' as const };
+          }
+          return installment;
+        });
 
-          const allPaid = newInstallments.every(inst => inst.status === 'Paga');
-          
-          return {
-            ...loan,
-            installments: newInstallments,
-            status: allPaid ? 'Pago' : loan.status,
-          };
+        const allPaid = newInstallments.every(inst => inst.status === 'Paga');
+        
+        return {
+          ...loan,
+          installments: newInstallments,
+          status: allPaid ? 'Pago' : loan.status,
+        };
+      }
+      return loan;
+    });
+    updateAndStoreLoans(newLoans);
+
+    // Update customer loan status if all their loans are paid
+    const customerId = newLoans.find(l => l.id === loanId)?.customerId;
+    if(customerId) {
+        const customerLoans = newLoans.filter(l => l.customerId === customerId);
+        const allCustomerLoansPaid = customerLoans.every(l => l.status === 'Pago');
+        if (allCustomerLoansPaid) {
+            const newCustomers = customers.map(c => 
+                c.id === customerId ? {...c, loanStatus: 'Pago'} : c
+            );
+            updateAndStoreCustomers(newCustomers);
         }
-        return loan;
-      })
-    );
+    }
   };
 
   const toggleCustomer = (customerId: string) => {
