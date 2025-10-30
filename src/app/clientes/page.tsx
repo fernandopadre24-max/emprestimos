@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { customers } from "@/lib/data"
 import type { Customer } from "@/lib/types"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
 export default function ClientesPage() {
   return (
@@ -35,7 +37,7 @@ export default function ClientesPage() {
                 <TableCell className="font-medium">{customer.name}</TableCell>
                 <TableCell className="hidden sm:table-cell">{customer.email}</TableCell>
                 <TableCell className="hidden sm:table-cell">{customer.cpf}</TableCell>
-                <TableCell className="hidden md:table-cell">{new Date(customer.registrationDate).toLocaleDateString('pt-BR')}</TableCell>
+                <TableCell className="hidden md:table-cell">{format(new Date(customer.registrationDate), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                 <TableCell className="text-right">
                   <Badge variant={customer.loanStatus === 'Ativo' ? 'secondary' : customer.loanStatus === 'Inadimplente' ? 'destructive' : 'default'} className={customer.loanStatus === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
                     {customer.loanStatus}

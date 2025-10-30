@@ -9,6 +9,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { loans, customers } from "@/lib/data"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
 export default function EmprestimosPage() {
   return (
@@ -43,7 +45,7 @@ export default function EmprestimosPage() {
                   <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                   <TableCell className="hidden md:table-cell">{loan.term} meses</TableCell>
                   <TableCell className="hidden md:table-cell">{(loan.interestRate * 100).toFixed(2)}% a.m.</TableCell>
-                  <TableCell className="hidden sm:table-cell">{new Date(loan.startDate).toLocaleDateString('pt-BR')}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{format(new Date(loan.startDate), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? 'bg-accent text-accent-foreground' : ''}>
                       {loan.status}

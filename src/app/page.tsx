@@ -4,7 +4,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -29,6 +28,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { loans, customers, chartData } from "@/lib/data"
 import type { ChartConfig } from "@/components/ui/chart"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
 const chartConfig = {
   emprestimos: {
@@ -156,7 +157,7 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {new Date(loan.startDate).toLocaleDateString('pt-BR')}
+                      {format(new Date(loan.startDate), 'dd/MM/yyyy', { locale: ptBR })}
                     </TableCell>
                     <TableCell className="text-right">
                        <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
