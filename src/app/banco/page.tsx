@@ -25,12 +25,13 @@ import {
   Plus,
 } from "lucide-react"
 
-import { bankAccounts as initialBankAccounts, bankSummary as initialBankSummary, transactions as initialTransactions } from "@/lib/data"
+import { bankAccounts as initialBankAccounts, transactions as initialTransactions } from "@/lib/data"
 import type { BankAccount, Transaction, NewBankAccount } from "@/lib/types"
 
 import { AddAccountDialog } from "@/components/banco/add-account-dialog"
 import { EditAccountDialog } from "@/components/banco/edit-account-dialog"
 import { NewTransactionDialog } from "@/components/banco/new-transaction-dialog"
+import { EditTransactionDialog } from "@/components/banco/edit-transaction-dialog"
 import { Badge } from "@/components/ui/badge"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -49,8 +50,10 @@ export default function BancoPage() {
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
   const [isEditAccountOpen, setEditAccountOpen] = useState(false);
   const [isTransactionOpen, setTransactionOpen] = useState(false);
+  const [isEditTransactionOpen, setEditTransactionOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
 
   useEffect(() => {
@@ -155,6 +158,63 @@ export default function BancoPage() {
 
     setTransactionOpen(false);
   }
+
+  const handleEditTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setEditTransactionOpen(true);
+  };
+
+  const handleEditTransaction = (editedTransactionData: Partial<Transaction>) => {
+    if (!selectedTransaction) return;
+
+    const oldTransaction = transactions.find(t => t.id === selectedTransaction.id);
+    if (!oldTransaction) return;
+
+    const updatedTransactions = transactions.map(t =>
+      t.id === selectedTransaction.id ? { ...t, ...editedTransactionData } : t
+    );
+    updateAndStoreTransactions(updatedTransactions);
+
+    // Adjust account balance
+    const valueDifference = (editedTransactionData.amount || oldTransaction.amount) - oldTransaction.amount;
+
+    const updatedAccounts = bankAccounts.map(account => {
+      if (account.id === oldTransaction.accountId) {
+        let newBalance = account.saldo;
+        if (oldTransaction.type === 'receita') {
+            newBalance += valueDifference;
+        } else { // despesa
+            newBalance -= valueDifference;
+        }
+        return { ...account, saldo: newBalance };
+      }
+      return account;
+    });
+    updateAndStoreBankAccounts(updatedAccounts);
+
+    setEditTransactionOpen(false);
+    setSelectedTransaction(null);
+  };
+
+  const handleDeleteTransaction = (transactionId: string) => {
+    const transactionToDelete = transactions.find(t => t.id === transactionId);
+    if (!transactionToDelete) return;
+
+    // Revert balance change
+    const updatedAccounts = bankAccounts.map(account => {
+      if (account.id === transactionToDelete.accountId) {
+        const newBalance = transactionToDelete.type === 'receita' 
+          ? account.saldo - transactionToDelete.amount 
+          : account.saldo + transactionToDelete.amount;
+        return { ...account, saldo: newBalance };
+      }
+      return account;
+    });
+    updateAndStoreBankAccounts(updatedAccounts);
+
+    const updatedTransactions = transactions.filter(t => t.id !== transactionId);
+    updateAndStoreTransactions(updatedTransactions);
+  };
 
   const toggleRow = (id: string) => {
     setExpandedRows(current =>
@@ -321,6 +381,7 @@ export default function BancoPage() {
                                             <TableHead>Descrição</TableHead>
                                             <TableHead>Tipo</TableHead>
                                             <TableHead className="text-right">Valor</TableHead>
+                                            <TableHead className="text-right">Ações</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -333,6 +394,16 @@ export default function BancoPage() {
                                                 </TableCell>
                                                 <TableCell className={cn("text-right font-medium", tx.type === 'receita' ? 'text-green-600' : 'text-red-600')}>
                                                     {tx.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL"})}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                  <div className="flex justify-end gap-2">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTransactionClick(tx)}>
+                                                        <FilePenLine className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteTransaction(tx.id)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                  </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -371,6 +442,13 @@ export default function BancoPage() {
         onSubmit={handleNewTransaction}
         transactionType={transactionType}
         account={selectedAccount}
+      />
+
+      <EditTransactionDialog
+        isOpen={isEditTransactionOpen}
+        onOpenChange={setEditTransactionOpen}
+        onSubmit={handleEditTransaction}
+        transaction={selectedTransaction}
       />
     </>
   )
