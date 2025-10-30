@@ -6,6 +6,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { CalendarIcon } from "lucide-react";
 
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,9 @@ import type { Customer, Loan, Installment } from "@/lib/types";
 import { generateInstallments } from "@/lib/data";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { customers as initialCustomers } from "@/lib/data";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 
 const formSchema = z.object({
@@ -33,6 +39,7 @@ const formSchema = z.object({
   amount: z.coerce.number().min(1, "O valor deve ser maior que zero."),
   interestRate: z.coerce.number().min(0, "A taxa de juros não pode ser negativa."),
   term: z.coerce.number().int().min(1, "O prazo deve ser de pelo menos 1 mês."),
+  startDate: z.date({ required_error: "A data de início é obrigatória." }),
   lateFeeRate: z.coerce.number().min(0, "A taxa de multa não pode ser negativa."),
 });
 
@@ -64,6 +71,7 @@ export default function LoanForm() {
       amount: 1000,
       interestRate: 5,
       term: 12,
+      startDate: new Date(),
       lateFeeRate: 3,
     },
   });
@@ -114,7 +122,7 @@ export default function LoanForm() {
         interestRate: values.interestRate / 100, // Store as decimal
         term: values.term,
         lateFeeRate: values.lateFeeRate / 100, // Store as decimal
-        startDate: new Date().toISOString(),
+        startDate: values.startDate.toISOString(),
         status: 'Em dia',
     };
 
@@ -172,6 +180,48 @@ export default function LoanForm() {
             />
 
           <h3 className="text-lg font-medium font-headline pt-4">Detalhes do Empréstimo</h3>
+           <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data de Início do Empréstimo</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "dd/MM/yyyy", { locale: ptBR })
+                          ) : (
+                            <span>Escolha uma data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -279,3 +329,5 @@ export default function LoanForm() {
     </Form>
   );
 }
+
+    
