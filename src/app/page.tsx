@@ -154,6 +154,7 @@ export default function Dashboard() {
               </TableHeader>
               <TableBody>
                 {loans.slice(0, 5).map(loan => {
+                  const date = parseISO(loan.startDate);
                   return (
                   <TableRow key={loan.id}>
                     <TableCell>
@@ -164,7 +165,7 @@ export default function Dashboard() {
                     </TableCell>
                     <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {isClient ? format(parseISO(loan.startDate), "dd/MM/yyyy", { locale: ptBR }) : ''}
+                      {isClient ? format(date, "dd/MM/yyyy", { locale: ptBR }) : ''}
                     </TableCell>
                     <TableCell className="text-right">
                        <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>

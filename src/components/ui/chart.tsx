@@ -355,36 +355,14 @@ function getPayloadConfigFromPayload(
     : config[key as keyof typeof config]
 }
 
-const Chart = RechartsPrimitive.ResponsiveContainer;
-const BarChart = React.forwardRef<
-  React.ElementRef<typeof RechartsPrimitive.BarChart>,
-  React.ComponentProps<typeof RechartsPrimitive.BarChart>
->((props, ref) => <RechartsPrimitive.BarChart ref={ref} {...props} />);
-BarChart.displayName = "BarChart";
+const {
+  BarChart,
+  XAxis,
+  YAxis,
+  Bar,
+  CartesianGrid
+} = RechartsPrimitive;
 
-const XAxis = React.forwardRef<
-  React.ElementRef<typeof RechartsPrimitive.XAxis>,
-  React.ComponentProps<typeof RechartsPrimitive.XAxis>
->((props, ref) => <RechartsPrimitive.XAxis ref={ref} {...props} />);
-XAxis.displayName = "XAxis";
-
-const YAxis = React.forwardRef<
-  React.ElementRef<typeof RechartsPrimitive.YAxis>,
-  React.ComponentProps<typeof RechartsPrimitive.YAxis>
->((props, ref) => <RechartsPrimitive.YAxis ref={ref} {...props} />);
-YAxis.displayName = "YAxis";
-
-const Bar = React.forwardRef<
-  React.ElementRef<typeof RechartsPrimitive.Bar>,
-  React.ComponentProps<typeof RechartsPrimitive.Bar>
->((props, ref) => <RechartsPrimitive.Bar ref={ref} {...props} />);
-Bar.displayName = "Bar";
-
-const CartesianGrid = React.forwardRef<
-  React.ElementRef<typeof RechartsPrimitive.CartesianGrid>,
-  React.ComponentProps<typeof RechartsPrimitive.CartesianGrid>
->((props, ref) => <RechartsPrimitive.CartesianGrid ref={ref} {...props} />);
-CartesianGrid.displayName = "CartesianGrid";
 
 export {
   ChartContainer,
@@ -393,7 +371,6 @@ export {
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
-  Chart,
   BarChart,
   XAxis,
   YAxis,
