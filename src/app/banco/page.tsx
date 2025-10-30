@@ -25,8 +25,8 @@ import {
   Plus,
 } from "lucide-react"
 
-import { bankAccounts, bankSummary, transactions } from "@/lib/data"
-import type { BankAccount, Transaction } from "@/lib/types"
+import { bankAccounts as initialBankAccounts, bankSummary, transactions as initialTransactions } from "@/lib/data"
+import type { BankAccount, Transaction, NewBankAccount } from "@/lib/types"
 
 import { AddAccountDialog } from "@/components/banco/add-account-dialog"
 import { EditAccountDialog } from "@/components/banco/edit-account-dialog"
@@ -37,6 +37,9 @@ import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 
 export default function BancoPage() {
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(initialBankAccounts);
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
   const [isEditAccountOpen, setEditAccountOpen] = useState(false);
   const [isTransactionOpen, setTransactionOpen] = useState(false);
@@ -55,8 +58,13 @@ export default function BancoPage() {
     setEditAccountOpen(true);
   }
 
-  const handleAddAccount = () => {
-    // Lógica para adicionar a conta viria aqui
+  const handleAddAccount = (newAccountData: NewBankAccount) => {
+    const newAccount: BankAccount = {
+      id: (bankAccounts.length + 1).toString(),
+      saldo: 0, // Saldo inicial de uma nova conta
+      ...newAccountData
+    };
+    setBankAccounts(currentAccounts => [...currentAccounts, newAccount]);
     setAddAccountOpen(false);
   }
 
@@ -227,30 +235,34 @@ export default function BancoPage() {
                         <TableCell colSpan={6}>
                           <div className="p-4 bg-muted/50 rounded-md">
                             <h4 className="font-bold mb-2">Transações Recentes</h4>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Data</TableHead>
-                                        <TableHead>Descrição</TableHead>
-                                        <TableHead>Tipo</TableHead>
-                                        <TableHead className="text-right">Valor</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {accountTransactions.map((tx: Transaction) => (
-                                        <TableRow key={tx.id}>
-                                            <TableCell>{format(parseISO(tx.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
-                                            <TableCell>{tx.description}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={tx.type === 'receita' ? 'secondary' : 'destructive'} className={tx.type === 'receita' ? "bg-green-200 text-green-800" : ""}>{tx.type}</Badge>
-                                            </TableCell>
-                                            <TableCell className={cn("text-right font-medium", tx.type === 'receita' ? 'text-green-600' : 'text-red-600')}>
-                                                {tx.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL"})}
-                                            </TableCell>
+                            {accountTransactions.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Data</TableHead>
+                                            <TableHead>Descrição</TableHead>
+                                            <TableHead>Tipo</TableHead>
+                                            <TableHead className="text-right">Valor</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {accountTransactions.map((tx: Transaction) => (
+                                            <TableRow key={tx.id}>
+                                                <TableCell>{format(parseISO(tx.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                                                <TableCell>{tx.description}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={tx.type === 'receita' ? 'secondary' : 'destructive'} className={tx.type === 'receita' ? "bg-green-200 text-green-800" : ""}>{tx.type}</Badge>
+                                                </TableCell>
+                                                <TableCell className={cn("text-right font-medium", tx.type === 'receita' ? 'text-green-600' : 'text-red-600')}>
+                                                    {tx.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL"})}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação para esta conta.</p>
+                            )}
                           </div>
                         </TableCell>
                      </TableRow>
@@ -285,3 +297,5 @@ export default function BancoPage() {
     </>
   )
 }
+
+    

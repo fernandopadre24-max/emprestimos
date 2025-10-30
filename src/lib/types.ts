@@ -1,5 +1,6 @@
 
 
+
 export interface Customer {
   id: string;
   name: string;
@@ -45,6 +46,8 @@ export interface BankAccount {
     saldo: number;
 }
 
+export type NewBankAccount = Omit<BankAccount, 'id' | 'saldo'>;
+
 export interface Transaction {
     id: string;
     accountId: string;
@@ -53,4 +56,6 @@ export interface Transaction {
     date: string;
     type: 'receita' | 'despesa';
 }
+    
+
     
