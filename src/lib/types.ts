@@ -17,6 +17,7 @@ export interface Loan {
   term: number; // in months
   startDate: string;
   status: 'Em dia' | 'Atrasado' | 'Pago';
+  remainingInstallments?: number;
 }
 
 export interface ChartData {
