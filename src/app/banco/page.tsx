@@ -60,7 +60,7 @@ export default function BancoPage() {
 
   const handleAddAccount = (newAccountData: NewBankAccount) => {
     const newAccount: BankAccount = {
-      id: (bankAccounts.length + 1).toString(),
+      id: (Math.random() + 1).toString(36).substring(7), // simple unique id
       saldo: 0, // Saldo inicial de uma nova conta
       ...newAccountData
     };
@@ -77,6 +77,10 @@ export default function BancoPage() {
         )
     );
     setEditAccountOpen(false);
+  }
+  
+  const handleDeleteAccount = (accountId: string) => {
+    setBankAccounts(currentAccounts => currentAccounts.filter(account => account.id !== accountId));
   }
 
   const handleNewTransaction = () => {
@@ -230,7 +234,7 @@ export default function BancoPage() {
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditAccountClick(account)}>
                           <FilePenLine className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteAccount(account.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -303,5 +307,3 @@ export default function BancoPage() {
     </>
   )
 }
-
-    

@@ -1,6 +1,3 @@
-
-
-
 export interface Customer {
   id: string;
   name: string;
@@ -9,6 +6,8 @@ export interface Customer {
   registrationDate: string;
   loanStatus: 'Ativo' | 'Pago' | 'Inadimplente';
 }
+
+export type NewCustomer = Omit<Customer, 'id' | 'registrationDate' | 'loanStatus'>;
 
 export interface Loan {
   id: string;
@@ -56,6 +55,3 @@ export interface Transaction {
     date: string;
     type: 'receita' | 'despesa';
 }
-    
-
-    
