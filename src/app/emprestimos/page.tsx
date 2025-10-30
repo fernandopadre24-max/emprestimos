@@ -46,21 +46,12 @@ export default function EmprestimosPage() {
     const loansData = storedLoans ? JSON.parse(storedLoans) : initialLoans;
     const bankAccountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
 
-    // Ensure all loaded loans have installments generated
-    const loansWithInstallments = loansData.map((loan: Loan) => {
-      if (!loan.installments || loan.installments.length === 0) {
-        return { ...loan, installments: generateInstallments(loan) };
-      }
-      return loan;
-    });
-
-
     setCustomers(customersData);
-    setLoans(loansWithInstallments);
+    setLoans(loansData);
     setBankAccounts(bankAccountsData);
 
     if (!storedCustomers) localStorage.setItem("customers", JSON.stringify(customersData));
-    if (!storedLoans) localStorage.setItem("loans", JSON.stringify(loansWithInstallments));
+    if (!storedLoans) localStorage.setItem("loans", JSON.stringify(loansData));
     if (!storedBankAccounts) localStorage.setItem("bankAccounts", JSON.stringify(bankAccountsData));
   }, []);
 
@@ -86,7 +77,7 @@ export default function EmprestimosPage() {
   }
 
   const calculateLateFee = (installment: Installment): Installment => {
-    if (installment.status === 'Paga' || !installment.dueDate) {
+    if (installment.status === 'Paga') {
       return installment;
     }
   
@@ -346,8 +337,6 @@ export default function EmprestimosPage() {
                                                 </TableHeader>
                                                 <TableBody>
                                                     {loan.installments.map(installment => {
-                                                        if (!installment.dueDate) return null; // Safety check
-                                                        
                                                         const today = new Date();
                                                         today.setHours(0,0,0,0);
                                                         const dueDate = parseISO(installment.dueDate);
@@ -358,7 +347,7 @@ export default function EmprestimosPage() {
                                                         return (
                                                         <TableRow key={installment.id}>
                                                             <TableCell>{installment.installmentNumber}</TableCell>
-                                                            <TableCell>{format(dueDate, "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                                                            <TableCell>{format(parseISO(installment.dueDate), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                                                             <TableCell>
                                                                 <Badge variant={displayStatus === 'Paga' ? 'secondary' : displayStatus === 'Atrasada' ? 'destructive' : 'outline'} className={cn(displayStatus === 'Paga' && 'bg-green-200 text-green-800')}>
                                                                     {displayStatus}
@@ -409,3 +398,5 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
+    

@@ -65,3 +65,5 @@ export interface Transaction {
     date: string;
     type: 'receita' | 'despesa';
 }
+
+    

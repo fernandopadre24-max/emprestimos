@@ -21,15 +21,6 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
     const monthlyPayment = monthlyRate > 0 
       ? (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfMonths)) / (Math.pow(1 + monthlyRate, numberOfMonths) - 1)
       : principal / numberOfMonths;
-
-    let paidCount = 0;
-    if (loan.status === 'Pago') {
-        paidCount = loan.term;
-    } else if (loan.status === 'Em dia') {
-        const today = new Date();
-        const monthsPassed = (today.getFullYear() - startDate.getFullYear()) * 12 + (today.getMonth() - startDate.getMonth());
-        paidCount = Math.max(0, monthsPassed);
-    }
     
     for (let i = 1; i <= loan.term; i++) {
         const dueDate = addMonths(startDate, i);
@@ -39,7 +30,7 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
             installmentNumber: i,
             amount: monthlyPayment,
             dueDate: formatISO(dueDate),
-            status: i <= paidCount ? 'Paga' : 'Pendente'
+            status: 'Pendente'
         });
     }
     return installments;
@@ -94,4 +85,6 @@ export const transactions: Transaction[] = [
     { id: 'T4', accountId: '1', description: 'Freela', amount: 800, date: '2024-07-10', type: 'receita' },
     { id: 'T5', accountId: '1', description: 'Conta de Luz', amount: 120.50, date: '2024-07-12', type: 'despesa' },
 ];
+    
+
     
