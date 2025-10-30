@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import {
@@ -60,7 +61,7 @@ export function CreditPaymentDialog({
         amountToPay = totalAmountDue;
     } else if (paymentType === 'partial') {
         amountToPay = partialAmount;
-    } else if (paymentType === 'interest') {
+    } else if (paymentType === 'interest' && lateFee > 0) {
         amountToPay = lateFee;
     }
 
@@ -177,3 +178,6 @@ export function CreditPaymentDialog({
     </Dialog>
   );
 }
+
+
+    

@@ -103,7 +103,7 @@ export default function EmprestimosPage() {
     today.setHours(0, 0, 0, 0);
     const dueDate = parseISO(installment.dueDate);
 
-    const amountDue = installment.originalAmount - (installment.paidAmount || 0);
+    const amountDue = (installment.originalAmount || installment.amount) - (installment.paidAmount || 0);
 
     if (today > dueDate) {
         const daysOverdue = differenceInDays(today, dueDate);
@@ -169,7 +169,7 @@ export default function EmprestimosPage() {
     if (checked) {
       // Open dialog to select account for payment
       const totalDue = calculateLateFee(installment, loan);
-      const lateFee = totalDue - (installment.originalAmount - (installment.paidAmount || 0));
+      const lateFee = totalDue - ((installment.originalAmount || installment.amount) - (installment.paidAmount || 0));
       const installmentWithFee = { ...installment, amount: totalDue, lateFee: lateFee > 0 ? lateFee : 0 };
       setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
       setCreditDialogOpen(true);
@@ -211,7 +211,8 @@ export default function EmprestimosPage() {
             const newInstallments = l.installments.map(i => {
                 if (i.id === installmentId) {
                     const newPaidAmount = (i.paidAmount || 0) + amountPaid;
-                    const isFullyPaid = newPaidAmount >= i.originalAmount;
+                    const originalAmount = i.originalAmount || i.amount;
+                    const isFullyPaid = newPaidAmount >= originalAmount;
 
                     return { 
                         ...i, 
@@ -432,7 +433,7 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {finalAmountDue > 0 ? finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : (0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                                 {isOverdue && installment.status !== 'Paga' && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
@@ -440,6 +441,7 @@ export default function EmprestimosPage() {
                                                                     checked={installment.status === 'Paga'}
                                                                     onCheckedChange={(checked) => handlePaymentToggle(checked, loan, installment)}
                                                                     aria-label={`Marcar parcela ${installment.installmentNumber} como paga`}
+                                                                    disabled={installment.status === 'Paga'}
                                                                 />
                                                             </TableCell>
                                                         </TableRow>
@@ -485,5 +487,7 @@ export default function EmprestimosPage() {
 
 
 
+
+    
 
     
