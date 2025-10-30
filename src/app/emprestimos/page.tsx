@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils"
 import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dialog"
 import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 
-const LATE_FEE_PERCENTAGE = 0.03; // 3% per day
+const DEFAULT_LATE_FEE_PERCENTAGE = 0.03; // 3% per day
 
 export default function EmprestimosPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -76,8 +76,8 @@ export default function EmprestimosPage() {
     localStorage.setItem("transactions", JSON.stringify([...transactions, ...newTransactions]));
   }
 
-  const calculateLateFee = (installment: Installment): Installment => {
-    if (installment.status === 'Paga') {
+  const calculateLateFee = (installment: Installment, loan: Loan): Installment => {
+    if (installment.status === 'Paga' || !installment.dueDate) {
       return installment;
     }
   
@@ -88,7 +88,8 @@ export default function EmprestimosPage() {
     if (today > dueDate) {
       const daysOverdue = differenceInDays(today, dueDate);
       if (daysOverdue > 0) {
-        const lateFee = installment.amount * LATE_FEE_PERCENTAGE * daysOverdue;
+        const lateFeeRate = loan.lateFeeRate ?? DEFAULT_LATE_FEE_PERCENTAGE;
+        const lateFee = installment.amount * lateFeeRate * daysOverdue;
         return {
           ...installment,
           amount: installment.amount + lateFee,
@@ -147,9 +148,9 @@ export default function EmprestimosPage() {
     setEditDialogOpen(false);
   };
 
-  const handlePayInstallmentClick = (loanId: string, installment: Installment) => {
-    const installmentWithFee = calculateLateFee(installment);
-    setPaymentDetails({ loanId, installment: installmentWithFee });
+  const handlePayInstallmentClick = (loan: Loan, installment: Installment) => {
+    const installmentWithFee = calculateLateFee(installment, loan);
+    setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
     setCreditDialogOpen(true);
   };
   
@@ -337,11 +338,12 @@ export default function EmprestimosPage() {
                                                 </TableHeader>
                                                 <TableBody>
                                                     {loan.installments.map(installment => {
+                                                        if (!installment.dueDate) return null; // Safety check
                                                         const today = new Date();
                                                         today.setHours(0,0,0,0);
                                                         const dueDate = parseISO(installment.dueDate);
                                                         const isOverdue = today > dueDate && installment.status === 'Pendente';
-                                                        const installmentWithFee = calculateLateFee(installment);
+                                                        const installmentWithFee = calculateLateFee(installment, loan);
                                                         const displayStatus = isOverdue ? 'Atrasada' : installment.status;
 
                                                         return (
@@ -358,7 +360,7 @@ export default function EmprestimosPage() {
                                                                 {isOverdue && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
-                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => handlePayInstallmentClick(loan.id, installment)} disabled={installment.status === 'Paga'}>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={() => handlePayInstallmentClick(loan, installment)} disabled={installment.status === 'Paga'}>
                                                                     <Check className="h-4 w-4" />
                                                                 </Button>
                                                             </TableCell>

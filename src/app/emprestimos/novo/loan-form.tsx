@@ -32,6 +32,7 @@ const formSchema = z.object({
   amount: z.coerce.number().min(1, "O valor deve ser maior que zero."),
   interestRate: z.coerce.number().min(0, "A taxa de juros não pode ser negativa."),
   term: z.coerce.number().int().min(1, "O prazo deve ser de pelo menos 1 mês."),
+  lateFeeRate: z.coerce.number().min(0, "A taxa de multa não pode ser negativa."),
 });
 
 interface Simulation {
@@ -54,6 +55,7 @@ export default function LoanForm() {
       amount: 1000,
       interestRate: 5,
       term: 12,
+      lateFeeRate: 3,
     },
   });
 
@@ -109,6 +111,7 @@ export default function LoanForm() {
         amount: values.amount,
         interestRate: values.interestRate / 100, // Store as decimal
         term: values.term,
+        lateFeeRate: values.lateFeeRate / 100, // Store as decimal
         startDate: new Date().toISOString(),
         status: 'Em dia',
     };
@@ -179,7 +182,7 @@ export default function LoanForm() {
           />
 
           <h3 className="text-lg font-medium font-headline pt-4">Detalhes do Empréstimo</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               control={form.control}
               name="amount"
@@ -195,6 +198,21 @@ export default function LoanForm() {
             />
             <FormField
               control={form.control}
+              name="term"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Prazo (meses)</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+             <FormField
+              control={form.control}
               name="interestRate"
               render={({ field }) => (
                 <FormItem>
@@ -208,10 +226,10 @@ export default function LoanForm() {
             />
             <FormField
               control={form.control}
-              name="term"
+              name="lateFeeRate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Prazo (meses)</FormLabel>
+                  <FormLabel>Multa por Atraso (% a.d.)</FormLabel>
                   <FormControl>
                     <Input type="number" {...field} />
                   </FormControl>

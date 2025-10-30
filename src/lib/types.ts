@@ -24,6 +24,7 @@ export interface Loan {
   amount: number;
   interestRate: number;
   term: number; // in months
+  lateFeeRate: number; // daily late fee percentage
   startDate: string;
   status: 'Em dia' | 'Atrasado' | 'Pago';
   installments: Installment[];
