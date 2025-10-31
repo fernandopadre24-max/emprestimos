@@ -1,53 +1,35 @@
 
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext } from "react";
 import type { FirebaseApp } from "firebase/app";
 import type { Auth } from "firebase/auth";
 import type { Firestore } from "firebase/firestore";
-import { initializeFirebase } from ".";
 import { FirebaseErrorListener } from "@/components/FirebaseErrorListener";
 
 interface FirebaseContextValue {
-  app: FirebaseApp | null;
-  auth: Auth | null;
-  firestore: Firestore | null;
+  app: FirebaseApp;
+  auth: Auth;
+  firestore: Firestore;
 }
 
 const FirebaseContext = createContext<FirebaseContextValue | null>(null);
 
-export function FirebaseProvider({ children }: { children: React.ReactNode }) {
-  const [services, setServices] = useState<FirebaseContextValue>({
-    app: null,
-    auth: null,
-    firestore: null,
-  });
-  const [isLoading, setIsLoading] = useState(true);
+interface FirebaseProviderProps {
+  children: React.ReactNode;
+  value: FirebaseContextValue;
+}
 
-  useEffect(() => {
-    // Initialize Firebase on the client-side
-    const { app, auth, firestore } = initializeFirebase();
-    setServices({ app, auth, firestore });
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Carregando...</div>
-      </div>
-    );
-  }
-
+export function FirebaseProvider({ children, value }: FirebaseProviderProps) {
   return (
-    <FirebaseContext.Provider value={services}>
+    <FirebaseContext.Provider value={value}>
       {children}
       <FirebaseErrorListener />
     </FirebaseContext.Provider>
   );
 }
 
-export const useFirebase = () => {
+export const useFirebase = (): FirebaseContextValue => {
   const context = useContext(FirebaseContext);
   if (!context) {
     throw new Error("useFirebase must be used within a FirebaseProvider");
@@ -55,7 +37,7 @@ export const useFirebase = () => {
   return context;
 };
 
-export const useFirebaseApp = () => {
+export const useFirebaseApp = (): FirebaseApp => {
   const { app } = useFirebase();
   if (!app) {
     throw new Error("Firebase App not available.");
@@ -63,7 +45,7 @@ export const useFirebaseApp = () => {
   return app;
 };
 
-export const useAuth = () => {
+export const useAuth = (): Auth => {
   const { auth } = useFirebase();
   if (!auth) {
     throw new Error("Firebase Auth not available.");
@@ -71,7 +53,7 @@ export const useAuth = () => {
   return auth;
 };
 
-export const useFirestore = () => {
+export const useFirestore = (): Firestore => {
   const { firestore } = useFirebase();
   if (!firestore) {
     throw new Error("Firebase Firestore not available.");
