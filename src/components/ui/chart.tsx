@@ -358,9 +358,13 @@ function getPayloadConfigFromPayload(
 
 const {
   BarChart,
+  LineChart,
+  AreaChart,
   XAxis,
   YAxis,
   Bar,
+  Line,
+  Area,
   CartesianGrid,
   ResponsiveContainer,
 } = RechartsPrimitive;
@@ -374,11 +378,15 @@ export {
   ChartLegendContent,
   ChartStyle,
   BarChart,
+  LineChart,
+  AreaChart,
   XAxis,
   YAxis,
   Bar,
+  Line,
+  Area,
   CartesianGrid,
   ResponsiveContainer,
 };
 
-    
+      

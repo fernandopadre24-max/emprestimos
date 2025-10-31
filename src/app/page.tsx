@@ -1,6 +1,7 @@
 
 "use client"
 
+import React, { useState, useEffect, useMemo } from "react"
 import {
   Card,
   CardContent,
@@ -18,6 +19,10 @@ import {
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
 } from "@/components/ui/chart"
 import {
   Table,
@@ -28,14 +33,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { loans as initialLoans, customers as initialCustomers, chartData, transactions as initialTransactions, bankAccounts as initialBankAccounts } from "@/lib/data"
+import { loans as initialLoans, customers as initialCustomers, transactions as initialTransactions, bankAccounts as initialBankAccounts } from "@/lib/data"
 import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO, getMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { useState, useEffect, useMemo } from "react"
 import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
 
 const chartConfig = {
   emprestimos: {
@@ -57,6 +63,7 @@ export default function Dashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
 
   useEffect(() => {
     const storedLoans = localStorage.getItem("loans");
@@ -121,6 +128,47 @@ export default function Dashboard() {
     .reduce((acc, t) => acc + t.amount, 0);
     
   const balancoGeral = totalReceitas - totalDespesas;
+
+
+  const renderChart = () => {
+    const ChartComponent = {
+        bar: BarChart,
+        line: LineChart,
+        area: AreaChart,
+    }[chartType];
+
+    const ChartElement = {
+        bar: Bar,
+        line: Line,
+        area: Area,
+    };
+    
+    const EmprestimosElement = React.createElement(ChartElement[chartType], { dataKey: "emprestimos", fill: "var(--color-emprestimos)", radius: chartType === 'bar' ? 4 : undefined, stroke: "var(--color-emprestimos)" });
+    const ReceitasElement = React.createElement(ChartElement[chartType], { dataKey: "receitas", fill: "var(--color-receitas)", radius: chartType === 'bar' ? 4 : undefined, stroke: "var(--color-receitas)" });
+    const DespesasElement = React.createElement(ChartElement[chartType], { dataKey: "despesas", fill: "var(--color-despesas)", radius: chartType === 'bar' ? 4 : undefined, stroke: "var(--color-despesas)" });
+
+    return (
+        <ChartContainer config={chartConfig} className="w-full h-[300px]">
+            <ChartComponent accessibilityLayer data={balanceChartData}>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                    dataKey="month"
+                    tickLine={false}
+                    tickMargin={10}
+                    axisLine={false}
+                />
+                <YAxis />
+                <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="dot" />}
+                />
+                {EmprestimosElement}
+                {ReceitasElement}
+                {DespesasElement}
+            </ChartComponent>
+        </ChartContainer>
+    );
+  };
 
 
   return (
@@ -309,31 +357,24 @@ export default function Dashboard() {
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="font-headline">Balanço Geral</CardTitle>
-            <CardDescription>Balanço mensal do ano corrente</CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-              <ChartContainer config={chartConfig} className="w-full h-[300px]">
-                <BarChart accessibilityLayer data={balanceChartData}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
-                  />
-                  <YAxis />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
-                  <Bar dataKey="receitas" fill="var(--color-receitas)" radius={4} />
-                  <Bar dataKey="despesas" fill="var(--color-despesas)" radius={4} />
-                </BarChart>
-              </ChartContainer>
-          </CardContent>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle className="font-headline">Balanço Geral</CardTitle>
+                        <CardDescription>Balanço mensal do ano corrente</CardDescription>
+                    </div>
+                    <Tabs defaultValue="bar" className="w-auto" onValueChange={(value) => setChartType(value as "bar" | "line" | "area")}>
+                        <TabsList>
+                            <TabsTrigger value="bar">Barras</TabsTrigger>
+                            <TabsTrigger value="line">Linhas</TabsTrigger>
+                            <TabsTrigger value="area">Área</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
+            </CardHeader>
+            <CardContent className="pl-2">
+                {renderChart()}
+            </CardContent>
         </Card>
       </div>
       <Card>
