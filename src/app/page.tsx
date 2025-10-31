@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils"
 const chartConfig = {
   emprestimos: {
     label: "Empréstimos",
-    color: "hsl(var(--primary))",
+    color: "hsl(var(--chart-1))",
   },
   receitas: {
     label: "Receitas",
@@ -72,12 +72,13 @@ export default function Dashboard() {
   }, []);
   
   const balanceChartData = useMemo(() => {
-    const monthlyData: { month: string; receitas: number; despesas: number }[] = Array.from({ length: 12 }, (_, i) => ({
+    const monthlyData: { month: string; emprestimos: number; receitas: number; despesas: number }[] = Array.from({ length: 12 }, (_, i) => ({
       month: format(new Date(2024, i, 1), "MMM", { locale: ptBR }),
+      emprestimos: 0,
       receitas: 0,
       despesas: 0,
     }));
-
+  
     transactions.forEach(transaction => {
       const monthIndex = getMonth(parseISO(transaction.date));
       if (transaction.type === 'receita') {
@@ -87,8 +88,13 @@ export default function Dashboard() {
       }
     });
 
+    loans.forEach(loan => {
+        const monthIndex = getMonth(parseISO(loan.startDate));
+        monthlyData[monthIndex].emprestimos += loan.amount;
+    });
+  
     return monthlyData;
-  }, [transactions]);
+  }, [transactions, loans]);
 
 
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
@@ -304,7 +310,7 @@ export default function Dashboard() {
         </Card>
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="font-headline">Balanço Geral (Receita vs. Despesa)</CardTitle>
+            <CardTitle className="font-headline">Balanço Geral</CardTitle>
             <CardDescription>Balanço mensal do ano corrente</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
@@ -322,6 +328,7 @@ export default function Dashboard() {
                     cursor={false}
                     content={<ChartTooltipContent indicator="dot" />}
                   />
+                  <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
                   <Bar dataKey="receitas" fill="var(--color-receitas)" radius={4} />
                   <Bar dataKey="despesas" fill="var(--color-despesas)" radius={4} />
                 </BarChart>
