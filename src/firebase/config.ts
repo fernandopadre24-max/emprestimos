@@ -1,4 +1,5 @@
 
+
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 export const firebaseConfig = {
@@ -10,3 +11,4 @@ export const firebaseConfig = {
   appId: "1:105658145244:web:127fd742c3c6f8903c734b",
   measurementId: "G-J51J3RV4S4"
 };
+
