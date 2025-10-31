@@ -1,3 +1,5 @@
+"use client"
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,11 +11,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/firebase"
 import { PlaceHolderImages } from "@/lib/placeholder-images"
+import { signOut } from "firebase/auth"
 import Link from "next/link"
 
 export default function UserNav() {
+  const auth = useAuth();
   const userAvatar = PlaceHolderImages.find(p => p.id === "user-avatar");
+
+  const handleSignOut = async () => {
+    if (auth) {
+      await signOut(auth);
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -47,7 +59,7 @@ export default function UserNav() {
           </Link>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSignOut}>
           Sair
         </DropdownMenuItem>
       </DropdownMenuContent>
