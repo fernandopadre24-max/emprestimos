@@ -209,8 +209,7 @@ export default function EmprestimosPage() {
             const newInstallments = l.installments.map(i => {
                 if (i.id === installmentId) {
                     const newPaidAmount = (i.paidAmount || 0) + amountPaid;
-                    const originalAmount = i.originalAmount || i.amount;
-                    const isFullyPaid = newPaidAmount >= originalAmount;
+                    const isFullyPaid = newPaidAmount >= i.originalAmount;
 
                     return { 
                         ...i, 
@@ -478,3 +477,4 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
