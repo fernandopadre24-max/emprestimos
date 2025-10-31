@@ -56,10 +56,17 @@ export default function Dashboard() {
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
   const totalCustomers = customers.length
   const profitability = loans.reduce((acc, loan) => {
-    const totalPaid = loan.installments
-      .filter(i => i.status === 'Paga')
-      .reduce((sum, i) => sum + i.amount, 0);
-    return acc + (totalPaid > loan.amount ? totalPaid - loan.amount : 0);
+    const principalPerInstallment = loan.amount / loan.term;
+    const loanProfit = loan.installments.reduce((installmentAcc, installment) => {
+        if (installment.paidAmount > 0) {
+            // A simple approximation of interest is the part of the payment that exceeds the principal for that installment.
+            // This is not entirely accurate for amortization schedules but gives a good estimate of profit from payments.
+            const profitFromInstallment = installment.paidAmount - principalPerInstallment;
+            return installmentAcc + (profitFromInstallment > 0 ? profitFromInstallment : 0);
+        }
+        return installmentAcc;
+    }, 0);
+    return acc + loanProfit;
   }, 0);
   const recentLoans = loans.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 5);
 
