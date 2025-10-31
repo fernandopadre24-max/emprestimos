@@ -23,6 +23,7 @@ import {
   ArrowRightLeft,
   Settings,
   Plus,
+  X,
 } from "lucide-react"
 
 import { bankAccounts as initialBankAccounts, transactions as initialTransactions } from "@/lib/data"
@@ -33,11 +34,26 @@ import { EditAccountDialog } from "@/components/banco/edit-account-dialog"
 import { NewTransactionDialog } from "@/components/banco/new-transaction-dialog"
 import { EditTransactionDialog } from "@/components/banco/edit-transaction-dialog"
 import { Badge } from "@/components/ui/badge"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, isWithinInterval } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import type { DateRange } from "react-day-picker"
+
+
+interface FilterState {
+  searchTerm: string;
+  type: string;
+  dateRange: DateRange | undefined;
+}
+
+const initialFilterState: FilterState = {
+  searchTerm: '',
+  type: 'todos',
+  dateRange: undefined,
+};
 
 
 export default function BancoPage() {
@@ -58,7 +74,7 @@ export default function BancoPage() {
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
-  const [filters, setFilters] = useState<Record<string, { searchTerm: string; type: string }>>({});
+  const [filters, setFilters] = useState<Record<string, FilterState>>({});
 
 
   useEffect(() => {
@@ -217,18 +233,27 @@ export default function BancoPage() {
     );
     // Initialize filter state for the account if it doesn't exist
     if (!filters[id]) {
-      handleFilterChange(id, 'searchTerm', '');
-      handleFilterChange(id, 'type', 'todos');
+      setFilters(prev => ({
+        ...prev,
+        [id]: initialFilterState,
+      }));
     }
   }
 
-  const handleFilterChange = (accountId: string, key: 'searchTerm' | 'type', value: string) => {
+  const handleFilterChange = (accountId: string, key: keyof FilterState, value: any) => {
     setFilters(prev => ({
       ...prev,
       [accountId]: {
         ...prev[accountId],
         [key]: value,
       },
+    }));
+  };
+  
+  const clearFilters = (accountId: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [accountId]: initialFilterState,
     }));
   };
 
@@ -341,7 +366,7 @@ export default function BancoPage() {
             <TableBody>
               {bankAccounts.map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
-                const accountFilter = filters[account.id] || { searchTerm: '', type: 'todos' };
+                const accountFilter = filters[account.id] || initialFilterState;
                 
                 const accountTransactions = transactions
                   .filter(t => t.accountId === account.id)
@@ -351,6 +376,17 @@ export default function BancoPage() {
                   .filter(t => 
                     accountFilter.type === 'todos' ? true : t.type === accountFilter.type
                   )
+                  .filter(t => {
+                    const { dateRange } = accountFilter;
+                    if (!dateRange || (!dateRange.from && !dateRange.to)) {
+                      return true;
+                    }
+                    const txDate = parseISO(t.date);
+                    return isWithinInterval(txDate, {
+                      start: dateRange.from || new Date(0),
+                      end: dateRange.to || new Date(),
+                    });
+                  })
                   .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
 
                 return (
@@ -396,26 +432,33 @@ export default function BancoPage() {
                           <div className="p-4 bg-muted/50 rounded-md">
                             <div className="flex justify-between items-center mb-4">
                                 <h4 className="font-bold">Transações Recentes</h4>
-                                <div className="flex gap-2">
-                                <Input 
-                                    placeholder="Buscar por descrição..." 
-                                    className="max-w-xs"
-                                    value={accountFilter.searchTerm}
-                                    onChange={(e) => handleFilterChange(account.id, 'searchTerm', e.target.value)}
-                                />
-                                <Select
-                                    value={accountFilter.type}
-                                    onValueChange={(value) => handleFilterChange(account.id, 'type', value)}
-                                >
-                                    <SelectTrigger className="w-[180px]">
-                                        <SelectValue placeholder="Filtrar por tipo" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="todos">Todos</SelectItem>
-                                        <SelectItem value="receita">Receitas</SelectItem>
-                                        <SelectItem value="despesa">Despesas</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex items-center gap-2">
+                                    <Input 
+                                        placeholder="Buscar por descrição..." 
+                                        className="max-w-xs"
+                                        value={accountFilter.searchTerm}
+                                        onChange={(e) => handleFilterChange(account.id, 'searchTerm', e.target.value)}
+                                    />
+                                    <Select
+                                        value={accountFilter.type}
+                                        onValueChange={(value) => handleFilterChange(account.id, 'type', value)}
+                                    >
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue placeholder="Filtrar por tipo" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="todos">Todos</SelectItem>
+                                            <SelectItem value="receita">Receitas</SelectItem>
+                                            <SelectItem value="despesa">Despesas</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                     <DateRangePicker
+                                      date={accountFilter.dateRange}
+                                      onDateChange={(date) => handleFilterChange(account.id, 'dateRange', date)}
+                                    />
+                                    <Button variant="ghost" onClick={() => clearFilters(account.id)}>
+                                        <X className="mr-2 h-4 w-4" /> Limpar
+                                    </Button>
                                 </div>
                             </div>
                             {accountTransactions.length > 0 ? (
