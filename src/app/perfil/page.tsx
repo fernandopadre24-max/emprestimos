@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export default function PerfilPage() {
     const userAvatarPlaceholder = PlaceHolderImages.find(p => p.id === "user-avatar");
@@ -24,12 +24,36 @@ export default function PerfilPage() {
     const [confirmPassword, setConfirmPassword] = useState("");
 
 
+    useEffect(() => {
+        const savedAvatar = localStorage.getItem("userAvatar");
+        if (savedAvatar) {
+            setAvatarPreview(savedAvatar);
+        }
+
+        const savedName = localStorage.getItem("userName");
+        if (savedName) {
+            setName(savedName);
+        }
+
+        const savedEmail = localStorage.getItem("userEmail");
+        if (savedEmail) {
+            setEmail(savedEmail);
+        }
+    }, []);
+
     const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setAvatarPreview(reader.result as string);
+                const result = reader.result as string;
+                setAvatarPreview(result);
+                localStorage.setItem("userAvatar", result);
+                toast({
+                    title: "Sucesso!",
+                    description: "Sua foto de perfil foi atualizada.",
+                    className: "bg-accent text-accent-foreground"
+                });
             };
             reader.readAsDataURL(file);
         }
@@ -40,6 +64,8 @@ export default function PerfilPage() {
     };
 
     const handleSaveChanges = () => {
+        localStorage.setItem("userName", name);
+        localStorage.setItem("userEmail", email);
         toast({
             title: "Sucesso!",
             description: "Suas informações foram atualizadas.",
