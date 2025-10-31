@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useMemo } from "react"
 import {
   Table,
   TableBody,
@@ -19,39 +19,39 @@ import { Button } from "@/components/ui/button"
 import { ChevronDown, FilePenLine, Plus, Trash2 } from "lucide-react"
 import { AddCustomerDialog } from "@/components/clientes/add-customer-dialog"
 import { EditCustomerDialog } from "@/components/clientes/edit-customer-dialog"
-import { customers as initialCustomers } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/firebase/auth/use-user"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, addDoc, doc, updateDoc, deleteDoc } from "firebase/firestore"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError } from "@/firebase/errors"
 
 export default function ClientesPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const customersQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/customers`) : null, [firestore, user]);
+  const { data: customers, loading } = useCollection<Customer>(customersQuery);
+
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
 
-  useEffect(() => {
-    const storedCustomers = localStorage.getItem("customers");
-    if (storedCustomers) {
-      setCustomers(JSON.parse(storedCustomers));
-    } else {
-      setCustomers(initialCustomers);
-      localStorage.setItem("customers", JSON.stringify(initialCustomers));
-    }
-  }, []);
 
-  const updateAndStoreCustomers = (newCustomers: Customer[]) => {
-    setCustomers(newCustomers);
-    localStorage.setItem("customers", JSON.stringify(newCustomers));
-  }
-
-  const handleAddCustomer = (newCustomerData: Omit<Customer, 'id' | 'registrationDate' | 'loanStatus'>) => {
-    const newCustomer: Customer = {
-      id: (Math.random() + 1).toString(36).substring(7),
+  const handleAddCustomer = async (newCustomerData: Omit<Customer, 'id' | 'registrationDate' | 'loanStatus'>) => {
+    if (!firestore || !user) return;
+    
+    const newCustomer: Omit<Customer, 'id'> = {
       registrationDate: new Date().toISOString(),
       loanStatus: 'Ativo',
       ...newCustomerData
     };
-    updateAndStoreCustomers([...customers, newCustomer]);
+    
+    const collectionRef = collection(firestore, `users/${user.uid}/customers`);
+    addDoc(collectionRef, newCustomer)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: collectionRef.path, operation: 'create', requestResourceData: newCustomer })));
+
     setAddDialogOpen(false);
   }
 
@@ -60,18 +60,22 @@ export default function ClientesPage() {
     setEditDialogOpen(true);
   }
   
-  const handleEditCustomer = (editedCustomerData: Partial<Customer>) => {
-    if (!selectedCustomer) return;
-    const updatedCustomers = customers.map(customer => 
-      customer.id === selectedCustomer.id ? { ...customer, ...editedCustomerData } : customer
-    );
-    updateAndStoreCustomers(updatedCustomers);
+  const handleEditCustomer = async (editedCustomerData: Partial<Customer>) => {
+    if (!selectedCustomer || !firestore || !user) return;
+    const docRef = doc(firestore, `users/${user.uid}/customers`, selectedCustomer.id);
+    
+    updateDoc(docRef, editedCustomerData)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: editedCustomerData })));
+
     setEditDialogOpen(false);
   }
 
   const handleDeleteCustomer = (customerId: string) => {
-    const updatedCustomers = customers.filter(customer => customer.id !== customerId);
-    updateAndStoreCustomers(updatedCustomers);
+    if (!firestore || !user) return;
+    const docRef = doc(firestore, `users/${user.uid}/customers`, customerId);
+
+    deleteDoc(docRef)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
   }
 
   const toggleRow = (id: string) => {
@@ -108,7 +112,7 @@ export default function ClientesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer: Customer) => {
+              {(customers || []).map((customer: Customer) => {
                 const isExpanded = expandedRows.includes(customer.id);
                 const date = parseISO(customer.registrationDate);
                 return (

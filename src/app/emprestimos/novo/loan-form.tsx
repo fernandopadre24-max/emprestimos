@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,10 +28,14 @@ import { Separator } from "@/components/ui/separator";
 import type { Customer, Loan, BankAccount } from "@/lib/types";
 import { generateInstallments } from "@/lib/data";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { customers as initialCustomers, bankAccounts as initialBankAccounts } from "@/lib/data";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/firebase/auth/use-user"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs } from "firebase/firestore"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError } from "@/firebase/errors"
 
 
 const formSchema = z.object({
@@ -53,25 +56,25 @@ interface Simulation {
 export default function LoanForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const customersQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/customers`) : null, [firestore, user]);
+  const { data: customers } = useCollection<Customer>(customersQuery);
+
   const [simulation, setSimulation] = useState<Simulation | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [availableBalance, setAvailableBalance] = useState<number>(0);
 
   useEffect(() => {
-    const storedCustomers = localStorage.getItem("customers");
-    if (storedCustomers) {
-      setCustomers(JSON.parse(storedCustomers));
-    } else {
-      setCustomers(initialCustomers);
-      localStorage.setItem("customers", JSON.stringify(initialCustomers));
-    }
-
-    const storedAccounts = localStorage.getItem("bankAccounts");
-    const accounts: BankAccount[] = storedAccounts ? JSON.parse(storedAccounts) : initialBankAccounts;
-    const totalBalance = accounts.reduce((acc, account) => acc + account.saldo, 0);
-    setAvailableBalance(totalBalance);
-
-  }, []);
+    if (!firestore || !user) return;
+    const getBalance = async () => {
+        const accountsCollection = collection(firestore, `users/${user.uid}/bankAccounts`);
+        const accountsSnapshot = await getDocs(accountsCollection);
+        const totalBalance = accountsSnapshot.docs.reduce((acc, doc) => acc + (doc.data() as BankAccount).saldo, 0);
+        setAvailableBalance(totalBalance);
+    };
+    getBalance();
+  }, [firestore, user]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -108,7 +111,8 @@ export default function LoanForm() {
   }
 
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore || !user || !customers) return;
 
     if (values.amount > availableBalance) {
         toast({
@@ -120,10 +124,9 @@ export default function LoanForm() {
     }
 
 
-    const storedLoans = localStorage.getItem("loans");
-    let loans: Loan[] = storedLoans ? JSON.parse(storedLoans) : [];
-
-    const nextLoanNumber = (loans.length || 0) + 1;
+    const loansCollection = collection(firestore, `users/${user.uid}/loans`);
+    const loansSnapshot = await getDocs(loansCollection);
+    const nextLoanNumber = loansSnapshot.size + 1;
     const newLoanCode = `CS-${nextLoanNumber.toString().padStart(3, '0')}`;
 
     const customer = customers.find(c => c.id === values.customerId);
@@ -137,8 +140,7 @@ export default function LoanForm() {
         return;
     }
     
-    const newLoanRaw: Omit<Loan, 'installments'> = {
-        id: `L${(Math.random() + 1).toString(36).substring(7)}`,
+    const newLoanRaw: Omit<Loan, 'id' | 'installments'> = {
         loanCode: newLoanCode,
         customerId: customer.id,
         amount: values.amount,
@@ -148,14 +150,17 @@ export default function LoanForm() {
         startDate: values.startDate.toISOString(),
         status: 'Em dia',
     };
-
+    
+    const loanDocRef = doc(loansCollection);
     const newLoan: Loan = {
       ...newLoanRaw,
-      installments: generateInstallments(newLoanRaw)
+      id: loanDocRef.id,
+      installments: generateInstallments({ ...newLoanRaw, id: loanDocRef.id })
     }
 
-    loans.push(newLoan);
-    localStorage.setItem("loans", JSON.stringify(loans));
+    addDoc(loansCollection, newLoan)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: loansCollection.path, operation: 'create', requestResourceData: newLoan })));
+
 
     toast({
       title: "Solicitação Enviada!",
@@ -187,7 +192,7 @@ export default function LoanForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {customers.map(customer => (
+                      {(customers || []).map(customer => (
                         <SelectItem key={customer.id} value={customer.id}>
                           {customer.name} ({customer.cpf})
                         </SelectItem>
@@ -352,5 +357,3 @@ export default function LoanForm() {
     </Form>
   );
 }
-
-    

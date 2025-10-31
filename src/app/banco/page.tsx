@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import {
   Table,
   TableBody,
@@ -36,7 +36,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-import { bankAccounts as initialBankAccounts, transactions as initialTransactions, categories as initialCategories } from "@/lib/data"
 import type { BankAccount, Transaction, NewBankAccount, Category } from "@/lib/types"
 
 import { AddAccountDialog } from "@/components/banco/add-account-dialog"
@@ -52,6 +51,11 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
+import { useUser } from "@/firebase/auth/use-user"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, addDoc, doc, updateDoc, deleteDoc, runTransaction } from "firebase/firestore"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError } from "@/firebase/errors"
 
 
 interface FilterState {
@@ -68,9 +72,17 @@ const initialFilterState: FilterState = {
 
 
 export default function BancoPage() {
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const bankAccountsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/bankAccounts`) : null, [firestore, user]);
+  const transactionsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/transactions`) : null, [firestore, user]);
+  const categoriesQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/categories`) : null, [firestore, user]);
+  
+  const { data: bankAccounts, loading: loadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+  const { data: transactions, loading: loadingTransactions } = useCollection<Transaction>(transactionsQuery);
+  const { data: categories, loading: loadingCategories } = useCollection<Category>(categoriesQuery);
+
   const [bankSummary, setBankSummary] = useState({
     receitas: 0,
     despesas: 0,
@@ -94,32 +106,14 @@ export default function BancoPage() {
 
 
   useEffect(() => {
-    const storedBankAccounts = localStorage.getItem("bankAccounts");
-    const storedTransactions = localStorage.getItem("transactions");
-    const storedCategories = localStorage.getItem("categories");
-
-    const accountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
-    const transactionsData = storedTransactions ? JSON.parse(storedTransactions) : initialTransactions;
-    const categoriesData = storedCategories ? JSON.parse(storedCategories) : initialCategories;
-
-    setBankAccounts(accountsData);
-    setTransactions(transactionsData);
-    setCategories(categoriesData);
-
-    if (!storedBankAccounts) localStorage.setItem("bankAccounts", JSON.stringify(accountsData));
-    if (!storedTransactions) localStorage.setItem("transactions", JSON.stringify(transactionsData));
-    if (!storedCategories) localStorage.setItem("categories", JSON.stringify(categoriesData));
-  }, []);
-
-  useEffect(() => {
     // Recalculate summary whenever accounts or transactions change
-    const saldoContas = bankAccounts.reduce((acc, account) => acc + account.saldo, 0);
+    const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
     
-    const receitas = transactions
+    const receitas = (transactions || [])
       .filter(t => t.type === 'receita')
       .reduce((acc, t) => acc + t.amount, 0);
 
-    const despesas = transactions
+    const despesas = (transactions || [])
       .filter(t => t.type === 'despesa')
       .reduce((acc, t) => acc + t.amount, 0);
 
@@ -127,22 +121,6 @@ export default function BancoPage() {
     
     setBankSummary({ saldoContas, receitas, despesas, balanco });
   }, [bankAccounts, transactions]);
-
-
-  const updateAndStoreBankAccounts = (newAccounts: BankAccount[]) => {
-    setBankAccounts(newAccounts);
-    localStorage.setItem("bankAccounts", JSON.stringify(newAccounts));
-  }
-  
-  const updateAndStoreTransactions = (newTransactions: Transaction[]) => {
-    setTransactions(newTransactions);
-    localStorage.setItem("transactions", JSON.stringify(newTransactions));
-  }
-
-  const updateAndStoreCategories = (newCategories: Category[]) => {
-    setCategories(newCategories);
-    localStorage.setItem("categories", JSON.stringify(newCategories));
-  }
 
 
   const handleTransaction = (account: BankAccount, type: "receita" | "despesa") => {
@@ -157,50 +135,64 @@ export default function BancoPage() {
   }
 
   const handleAddAccount = (newAccountData: NewBankAccount) => {
-    const newAccount: BankAccount = {
-      id: (Math.random() + 1).toString(36).substring(7),
+    if (!firestore || !user) return;
+    const newAccount: Omit<BankAccount, 'id'> = {
       saldo: 0,
       ...newAccountData
     };
-    updateAndStoreBankAccounts([...bankAccounts, newAccount]);
+    const collectionRef = collection(firestore, `users/${user.uid}/bankAccounts`);
+    addDoc(collectionRef, newAccount)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: collectionRef.path, operation: 'create', requestResourceData: newAccount })));
+
     setAddAccountOpen(false);
   }
 
   const handleEditAccount = (editedAccountData: Partial<BankAccount>) => {
-    if (!selectedAccount) return;
+    if (!selectedAccount || !firestore || !user) return;
+    const docRef = doc(firestore, `users/${user.uid}/bankAccounts`, selectedAccount.id);
+    updateDoc(docRef, editedAccountData)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: editedAccountData })));
     
-    const updatedAccounts = bankAccounts.map(account => 
-      account.id === selectedAccount.id ? { ...account, ...editedAccountData } : account
-    );
-    updateAndStoreBankAccounts(updatedAccounts);
     setEditAccountOpen(false);
   }
   
   const handleDeleteAccount = (accountId: string) => {
-    const updatedAccounts = bankAccounts.filter(account => account.id !== accountId);
-    updateAndStoreBankAccounts(updatedAccounts);
+    if (!firestore || !user) return;
+    const docRef = doc(firestore, `users/${user.uid}/bankAccounts`, accountId);
+    deleteDoc(docRef)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
   }
 
   const handleNewTransaction = (transactionData: Omit<Transaction, 'id' | 'accountId' | 'type' | 'date'>) => {
-    if(!selectedAccount) return;
-    const newTransaction: Transaction = {
-      id: `T${(Math.random() + 1).toString(36).substring(7)}`,
+    if(!selectedAccount || !firestore || !user) return;
+    
+    const newTransaction: Omit<Transaction, 'id'> = {
       accountId: selectedAccount.id,
       type: transactionType,
       date: new Date().toISOString(),
       ...transactionData,
     };
-    
-    updateAndStoreTransactions([...transactions, newTransaction]);
-    
-    const updatedAccounts = bankAccounts.map(account => {
-        if(account.id === selectedAccount.id) {
-            const newBalance = transactionType === 'receita' ? account.saldo + newTransaction.amount : account.saldo - newTransaction.amount;
-            return { ...account, saldo: newBalance };
-        }
-        return account;
+
+    runTransaction(firestore, async (transaction) => {
+      const accountRef = doc(firestore, `users/${user.uid}/bankAccounts`, selectedAccount.id);
+      const accountDoc = await transaction.get(accountRef);
+
+      if (!accountDoc.exists()) {
+        throw "Account does not exist!";
+      }
+
+      const newBalance = transactionType === 'receita' 
+        ? accountDoc.data().saldo + newTransaction.amount 
+        : accountDoc.data().saldo - newTransaction.amount;
+      
+      transaction.update(accountRef, { saldo: newBalance });
+
+      const newTransactionRef = doc(collection(firestore, `users/${user.uid}/transactions`));
+      transaction.set(newTransactionRef, newTransaction);
+    }).catch(err => {
+        // This needs a more specific error handling path for transactions
+        console.error("Transaction failed: ", err);
     });
-    updateAndStoreBankAccounts(updatedAccounts);
 
     setTransactionOpen(false);
   }
@@ -211,42 +203,37 @@ export default function BancoPage() {
   };
 
   const handleEditTransaction = (editedTransactionData: Partial<Transaction>) => {
-    if (!selectedTransaction) return;
-
-    const oldTransaction = transactions.find(t => t.id === selectedTransaction.id);
+    if (!selectedTransaction || !firestore || !user) return;
+    
+    const oldTransaction = (transactions || []).find(t => t.id === selectedTransaction.id);
     if (!oldTransaction) return;
 
-    // Prevent direct editing of loan-related transactions for now
     if (oldTransaction.sourceId?.startsWith('loan:')) {
         alert("Não é possível editar transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
         setEditTransactionOpen(false);
         return;
     }
+    
+    runTransaction(firestore, async (transaction) => {
+        const transactionRef = doc(firestore, `users/${user.uid}/transactions`, selectedTransaction.id);
+        transaction.update(transactionRef, editedTransactionData);
 
-    const updatedTransactions = transactions.map(t =>
-      t.id === selectedTransaction.id ? { ...t, ...editedTransactionData } : t
-    );
-    updateAndStoreTransactions(updatedTransactions);
+        const amountDifference = (editedTransactionData.amount ?? oldTransaction.amount) - oldTransaction.amount;
+        if (amountDifference !== 0) {
+            const accountRef = doc(firestore, `users/${user.uid}/bankAccounts`, oldTransaction.accountId);
+            const accountDoc = await transaction.get(accountRef);
+            if (!accountDoc.exists()) throw "Account does not exist!";
 
-    // Adjust account balance
-    const amountDifference = (editedTransactionData.amount ?? oldTransaction.amount) - oldTransaction.amount;
-
-    const updatedAccounts = bankAccounts.map(account => {
-      if (account.id === oldTransaction.accountId) {
-        let newBalance = account.saldo;
-        // This logic is tricky. Let's assume type doesn't change.
-        if (oldTransaction.type === 'receita') {
-            // if amount increased, increase balance. if amount decreased, decrease balance
-            newBalance += amountDifference;
-        } else { // despesa
-            // if amount increased, decrease balance. if amount decreased, increase balance
-            newBalance -= amountDifference;
+            let newBalance = accountDoc.data().saldo;
+            if (oldTransaction.type === 'receita') {
+                newBalance += amountDifference;
+            } else {
+                newBalance -= amountDifference;
+            }
+            transaction.update(accountRef, { saldo: newBalance });
         }
-        return { ...account, saldo: newBalance };
-      }
-      return account;
-    });
-    updateAndStoreBankAccounts(updatedAccounts);
+    }).catch(err => console.error("Edit transaction failed:", err));
+
 
     setEditTransactionOpen(false);
     setSelectedTransaction(null);
@@ -258,45 +245,47 @@ export default function BancoPage() {
   }
 
   const handleDeleteTransaction = () => {
-    if (!selectedTransaction) return;
+    if (!selectedTransaction || !firestore || !user) return;
 
     if (selectedTransaction.sourceId?.startsWith('loan:')) {
         alert("Não é possível excluir transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
         setDeleteTransactionAlertOpen(false);
         return;
     }
+    
+    runTransaction(firestore, async (transaction) => {
+        // Revert account balance
+        const accountRef = doc(firestore, `users/${user.uid}/bankAccounts`, selectedTransaction.accountId);
+        const accountDoc = await transaction.get(accountRef);
+        if (!accountDoc.exists()) throw "Account not found";
 
-    // Revert account balance
-    const updatedAccounts = bankAccounts.map(account => {
-        if (account.id === selectedTransaction.accountId) {
-            const newBalance = selectedTransaction.type === 'receita'
-                ? account.saldo - selectedTransaction.amount
-                : account.saldo + selectedTransaction.amount;
-            return { ...account, saldo: newBalance };
-        }
-        return account;
-    });
-    updateAndStoreBankAccounts(updatedAccounts);
+        const newBalance = selectedTransaction.type === 'receita'
+            ? accountDoc.data().saldo - selectedTransaction.amount
+            : accountDoc.data().saldo + selectedTransaction.amount;
+        transaction.update(accountRef, { saldo: newBalance });
+        
+        // Delete transaction
+        const transactionRef = doc(firestore, `users/${user.uid}/transactions`, selectedTransaction.id);
+        transaction.delete(transactionRef);
+    }).catch(err => console.error("Delete transaction failed:", err));
 
-    // Remove transaction
-    const updatedTransactions = transactions.filter(t => t.id !== selectedTransaction.id);
-    updateAndStoreTransactions(updatedTransactions);
 
     setDeleteTransactionAlertOpen(false);
     setSelectedTransaction(null);
   }
 
   const handleAddCategory = (category: Omit<Category, 'id'>) => {
-    const newCategory: Category = {
-        id: `C${(Math.random() + 1).toString(36).substring(7)}`,
-        ...category
-    };
-    updateAndStoreCategories([...categories, newCategory]);
+    if (!firestore || !user) return;
+    const collectionRef = collection(firestore, `users/${user.uid}/categories`);
+    addDoc(collectionRef, category)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: collectionRef.path, operation: 'create', requestResourceData: category })));
   }
 
   const handleDeleteCategory = (categoryId: string) => {
-    const updatedCategories = categories.filter(c => c.id !== categoryId);
-    updateAndStoreCategories(updatedCategories);
+    if (!firestore || !user) return;
+    const docRef = doc(firestore, `users/${user.uid}/categories`, categoryId);
+    deleteDoc(docRef)
+        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
   }
 
   const toggleRow = (id: string) => {
@@ -436,11 +425,11 @@ export default function BancoPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bankAccounts.map((account: BankAccount) => {
+              {(bankAccounts || []).map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
                 const accountFilter = filters[account.id] || initialFilterState;
                 
-                const accountTransactions = transactions
+                const accountTransactions = (transactions || [])
                   .filter(t => t.accountId === account.id)
                   .filter(t => 
                     t.description.toLowerCase().includes(accountFilter.searchTerm.toLowerCase())
@@ -606,7 +595,7 @@ export default function BancoPage() {
         onSubmit={handleNewTransaction}
         transactionType={transactionType}
         account={selectedAccount}
-        categories={categories}
+        categories={categories || []}
       />
 
       <EditTransactionDialog
@@ -614,13 +603,13 @@ export default function BancoPage() {
         onOpenChange={setEditTransactionOpen}
         onSubmit={handleEditTransaction}
         transaction={selectedTransaction}
-        categories={categories}
+        categories={categories || []}
       />
       
       <ManageCategoriesDialog
         isOpen={isManageCategoriesOpen}
         onOpenChange={setManageCategoriesOpen}
-        categories={categories}
+        categories={categories || []}
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
       />

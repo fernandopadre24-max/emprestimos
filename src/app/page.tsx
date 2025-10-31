@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useMemo } from "react"
 import {
   Card,
   CardContent,
@@ -33,7 +33,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { loans as initialLoans, customers as initialCustomers, transactions as initialTransactions, bankAccounts as initialBankAccounts } from "@/lib/data"
 import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO, getMonth } from "date-fns"
@@ -41,6 +40,9 @@ import { ptBR } from "date-fns/locale"
 import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useUser } from "@/firebase/auth/use-user"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { collection, query, orderBy, limit, where } from "firebase/firestore"
 
 
 const chartConfig = {
@@ -59,24 +61,22 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function Dashboard() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const loansQuery = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, `users/${user.uid}/loans`), orderBy('startDate', 'desc'), limit(5)) : null, [firestore, user]);
+  const customersQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/customers`) : null, [firestore, user]);
+  const transactionsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/transactions`) : null, [firestore, user]);
+  const bankAccountsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/bankAccounts`) : null, [firestore, user]);
+  const allLoansQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/loans`) : null, [firestore, user]);
+
+  const { data: recentLoans } = useCollection<Loan>(loansQuery);
+  const { data: customers } = useCollection<Customer>(customersQuery);
+  const { data: transactions } = useCollection<Transaction>(transactionsQuery);
+  const { data: bankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+  const { data: allLoans } = useCollection<Loan>(allLoansQuery);
+
   const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
-
-  useEffect(() => {
-    const storedLoans = localStorage.getItem("loans");
-    const storedCustomers = localStorage.getItem("customers");
-    const storedTransactions = localStorage.getItem("transactions");
-    const storedBankAccounts = localStorage.getItem("bankAccounts");
-
-    setLoans(storedLoans ? JSON.parse(storedLoans) : initialLoans);
-    setCustomers(storedCustomers ? JSON.parse(storedCustomers) : initialCustomers);
-    setTransactions(storedTransactions ? JSON.parse(storedTransactions) : initialTransactions);
-    setBankAccounts(storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts);
-
-  }, []);
   
   const balanceChartData = useMemo(() => {
     const monthlyData: { month: string; emprestimos: number; receitas: number; despesas: number }[] = Array.from({ length: 12 }, (_, i) => ({
@@ -86,7 +86,7 @@ export default function Dashboard() {
       despesas: 0,
     }));
   
-    transactions.forEach(transaction => {
+    (transactions || []).forEach(transaction => {
       const monthIndex = getMonth(parseISO(transaction.date));
       if (transaction.type === 'receita') {
         monthlyData[monthIndex].receitas += transaction.amount;
@@ -95,18 +95,19 @@ export default function Dashboard() {
       }
     });
 
-    loans.forEach(loan => {
+    (allLoans || []).forEach(loan => {
         const monthIndex = getMonth(parseISO(loan.startDate));
         monthlyData[monthIndex].emprestimos += loan.amount;
     });
   
     return monthlyData;
-  }, [transactions, loans]);
+  }, [transactions, allLoans]);
 
 
-  const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
-  const totalCustomers = customers.length
-  const profitability = loans.reduce((acc, loan) => {
+  const totalValue = (allLoans || []).reduce((acc, loan) => acc + loan.amount, 0)
+  const totalCustomers = (customers || []).length
+  const profitability = (allLoans || []).reduce((acc, loan) => {
+    if (!loan.installments) return acc;
     const principalPerInstallment = loan.amount / loan.term;
     const loanProfit = loan.installments.reduce((installmentAcc, installment) => {
         if (installment.paidAmount > 0) {
@@ -117,13 +118,12 @@ export default function Dashboard() {
     }, 0);
     return acc + loanProfit;
   }, 0);
-  const recentLoans = loans.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 5);
   
-  const totalReceitas = transactions
+  const totalReceitas = (transactions || [])
     .filter(t => t.type === 'receita')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const totalDespesas = transactions
+  const totalDespesas = (transactions || [])
     .filter(t => t.type === 'despesa')
     .reduce((acc, t) => acc + t.amount, 0);
     
@@ -198,7 +198,7 @@ export default function Dashboard() {
               {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Total de {loans.length} empréstimos concedidos.
+              Total de {(allLoans || []).length} empréstimos concedidos.
             </p>
           </CardContent>
         </Card>
@@ -329,9 +329,9 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentLoans.map(loan => {
+                {(recentLoans || []).map(loan => {
                   const date = parseISO(loan.startDate);
-                  const customer = customers.find(c => c.id === loan.customerId);
+                  const customer = (customers || []).find(c => c.id === loan.customerId);
                   return (
                   <TableRow key={loan.id}>
                     <TableCell>
@@ -394,7 +394,7 @@ export default function Dashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bankAccounts.map((account) => (
+              {(bankAccounts || []).map((account) => (
                 <TableRow key={account.id}>
                   <TableCell className="font-medium">{account.banco}</TableCell>
                   <TableCell>{account.agencia} / {account.conta}</TableCell>
@@ -410,5 +410,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
-    
