@@ -8,7 +8,6 @@ import { ThemeProvider } from '@/components/theme-provider';
 import MainSidebar from '@/components/main-sidebar';
 import Header from '@/components/header';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -39,7 +38,6 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseClientProvider>
             <Toaster />
             <SidebarProvider>
               <MainSidebar />
@@ -50,7 +48,6 @@ export default function RootLayout({
                 </main>
               </div>
             </SidebarProvider>
-          </FirebaseClientProvider>
         </ThemeProvider>
       </body>
     </html>

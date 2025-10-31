@@ -40,9 +40,7 @@ import { ptBR } from "date-fns/locale"
 import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useUser } from "@/firebase/auth/use-user"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, query, orderBy, limit, where } from "firebase/firestore"
+import { loans as allLoans, customers, transactions, bankAccounts } from "@/lib/data"
 
 
 const chartConfig = {
@@ -61,23 +59,10 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function Dashboard() {
-  const { user } = useUser();
-  const firestore = useFirestore();
-
-  const loansQuery = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, `users/${user.uid}/loans`), orderBy('startDate', 'desc'), limit(5)) : null, [firestore, user]);
-  const customersQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/customers`) : null, [firestore, user]);
-  const transactionsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/transactions`) : null, [firestore, user]);
-  const bankAccountsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/bankAccounts`) : null, [firestore, user]);
-  const allLoansQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/loans`) : null, [firestore, user]);
-
-  const { data: recentLoans } = useCollection<Loan>(loansQuery);
-  const { data: customers } = useCollection<Customer>(customersQuery);
-  const { data: transactions } = useCollection<Transaction>(transactionsQuery);
-  const { data: bankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
-  const { data: allLoans } = useCollection<Loan>(allLoansQuery);
-
   const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
   
+  const recentLoans = allLoans.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 5);
+
   const balanceChartData = useMemo(() => {
     const monthlyData: { month: string; emprestimos: number; receitas: number; despesas: number }[] = Array.from({ length: 12 }, (_, i) => ({
       month: format(new Date(2024, i, 1), "MMM", { locale: ptBR }),
@@ -86,7 +71,7 @@ export default function Dashboard() {
       despesas: 0,
     }));
   
-    (transactions || []).forEach(transaction => {
+    transactions.forEach(transaction => {
       const monthIndex = getMonth(parseISO(transaction.date));
       if (transaction.type === 'receita') {
         monthlyData[monthIndex].receitas += transaction.amount;
@@ -95,7 +80,7 @@ export default function Dashboard() {
       }
     });
 
-    (allLoans || []).forEach(loan => {
+    allLoans.forEach(loan => {
         const monthIndex = getMonth(parseISO(loan.startDate));
         monthlyData[monthIndex].emprestimos += loan.amount;
     });
@@ -104,9 +89,9 @@ export default function Dashboard() {
   }, [transactions, allLoans]);
 
 
-  const totalValue = (allLoans || []).reduce((acc, loan) => acc + loan.amount, 0)
-  const totalCustomers = (customers || []).length
-  const profitability = (allLoans || []).reduce((acc, loan) => {
+  const totalValue = allLoans.reduce((acc, loan) => acc + loan.amount, 0)
+  const totalCustomers = customers.length
+  const profitability = allLoans.reduce((acc, loan) => {
     if (!loan.installments) return acc;
     const principalPerInstallment = loan.amount / loan.term;
     const loanProfit = loan.installments.reduce((installmentAcc, installment) => {
@@ -119,11 +104,11 @@ export default function Dashboard() {
     return acc + loanProfit;
   }, 0);
   
-  const totalReceitas = (transactions || [])
+  const totalReceitas = transactions
     .filter(t => t.type === 'receita')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const totalDespesas = (transactions || [])
+  const totalDespesas = transactions
     .filter(t => t.type === 'despesa')
     .reduce((acc, t) => acc + t.amount, 0);
     
@@ -198,7 +183,7 @@ export default function Dashboard() {
               {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              Total de {(allLoans || []).length} empréstimos concedidos.
+              Total de {allLoans.length} empréstimos concedidos.
             </p>
           </CardContent>
         </Card>
@@ -329,9 +314,9 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(recentLoans || []).map(loan => {
+                {recentLoans.map(loan => {
                   const date = parseISO(loan.startDate);
-                  const customer = (customers || []).find(c => c.id === loan.customerId);
+                  const customer = customers.find(c => c.id === loan.customerId);
                   return (
                   <TableRow key={loan.id}>
                     <TableCell>
@@ -394,7 +379,7 @@ export default function Dashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(bankAccounts || []).map((account) => (
+              {bankAccounts.map((account) => (
                 <TableRow key={account.id}>
                   <TableCell className="font-medium">{account.banco}</TableCell>
                   <TableCell>{account.agencia} / {account.conta}</TableCell>

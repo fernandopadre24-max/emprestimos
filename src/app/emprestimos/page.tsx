@@ -22,25 +22,13 @@ import { cn } from "@/lib/utils"
 import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dialog"
 import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 import { Switch } from "@/components/ui/switch"
-import { useUser } from "@/firebase/auth/use-user"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, doc, updateDoc, deleteDoc, runTransaction, addDoc } from "firebase/firestore"
-import { errorEmitter } from "@/firebase/error-emitter"
-import { FirestorePermissionError } from "@/firebase/errors"
+import { loans as mockLoans, customers as mockCustomers, bankAccounts as mockBankAccounts, transactions as mockTransactions } from "@/lib/data"
 
 export default function EmprestimosPage() {
-  const { user } = useUser();
-  const firestore = useFirestore();
-
-  const loansQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/loans`) : null, [firestore, user]);
-  const customersQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/customers`) : null, [firestore, user]);
-  const bankAccountsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/bankAccounts`) : null, [firestore, user]);
-  const transactionsQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/transactions`) : null, [firestore, user]);
-  
-  const { data: loans, loading: loadingLoans } = useCollection<Loan>(loansQuery);
-  const { data: customers, loading: loadingCustomers } = useCollection<Customer>(customersQuery);
-  const { data: bankAccounts, loading: loadingBankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
-  const { data: transactions, loading: loadingTransactions } = useCollection<Transaction>(transactionsQuery);
+  const [loans, setLoans] = useState<Loan[]>(mockLoans);
+  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(mockBankAccounts);
+  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
 
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<string[]>([]);
   const [expandedLoanIds, setExpandedLoanIds] = useState<string[]>([]);
@@ -51,7 +39,7 @@ export default function EmprestimosPage() {
   const [paymentDetails, setPaymentDetails] = useState<{loanId: string, installment: Installment} | null>(null);
 
   const loansWithData = useMemo(() => {
-    return (loans || []).map((loan: Loan) => {
+    return loans.map((loan: Loan) => {
       const installments = (loan.installments && loan.installments.length > 0)
         ? loan.installments.map(i => ({ 
             ...i, 
@@ -107,10 +95,7 @@ export default function EmprestimosPage() {
   }, [loansWithData, customers]);
 
   const handleDeleteLoan = (loanId: string) => {
-    if (!firestore || !user) return;
-    const docRef = doc(firestore, `users/${user.uid}/loans`, loanId);
-    deleteDoc(docRef)
-        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'delete' })));
+    setLoans(prev => prev.filter(l => l.id !== loanId));
   }
 
   const handleEditLoanClick = (loan: Loan) => {
@@ -119,15 +104,16 @@ export default function EmprestimosPage() {
   }
 
   const handleEditLoan = (editedLoanData: Partial<Loan>) => {
-    if (!selectedLoan || !firestore || !user) return;
+    if (!selectedLoan) return;
 
-    const docRef = doc(firestore, `users/${user.uid}/loans`, selectedLoan.id);
-    const updatedLoanRaw = { ...selectedLoan, ...editedLoanData };
-    const newInstallments = generateInstallments(updatedLoanRaw);
-    const finalData = { ...editedLoanData, installments: newInstallments };
-    
-    updateDoc(docRef, finalData)
-        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: docRef.path, operation: 'update', requestResourceData: finalData })));
+    setLoans(prev => prev.map(loan => {
+      if(loan.id === selectedLoan.id) {
+        const updatedLoanRaw = { ...loan, ...editedLoanData };
+        const newInstallments = generateInstallments(updatedLoanRaw);
+        return { ...updatedLoanRaw, installments: newInstallments };
+      }
+      return loan;
+    }))
 
     setEditDialogOpen(false);
   };
@@ -147,8 +133,6 @@ export default function EmprestimosPage() {
   };
   
   const handleConfirmPayment = (loanId: string, installmentId: string, accountId: string, amountPaid: number, paymentType: string) => {
-    if (!firestore || !user || !loans || !customers) return;
-    
     const loan = loans.find(l => l.id === loanId);
     const customer = customers.find(c => c.id === loan?.customerId);
     if (!loan || !customer) return;
@@ -156,88 +140,96 @@ export default function EmprestimosPage() {
     const installment = loan.installments.find(i => i.id === installmentId);
     if (!installment) return;
     
-    runTransaction(firestore, async (transaction) => {
-        // Create Transaction
-        const newTransactionData: Omit<Transaction, 'id'> = {
-            accountId: accountId,
-            description: `Pgto. Parc. ${installment.installmentNumber}/${loan.term} - ${loan.loanCode} - ${customer.name}`,
-            amount: amountPaid,
-            date: new Date().toISOString(),
-            type: 'receita',
-            sourceId: `loan:${loanId}-installment:${installmentId}`,
-        };
-        const newTransactionRef = doc(collection(firestore, `users/${user.uid}/transactions`));
-        transaction.set(newTransactionRef, newTransactionData);
+    // Create Transaction
+    const newTransactionData: Transaction = {
+        id: `T${Date.now()}`,
+        accountId: accountId,
+        description: `Pgto. Parc. ${installment.installmentNumber}/${loan.term} - ${loan.loanCode} - ${customer.name}`,
+        amount: amountPaid,
+        date: new Date().toISOString(),
+        type: 'receita',
+        sourceId: `loan:${loanId}-installment:${installmentId}`,
+    };
+    setTransactions(prev => [...prev, newTransactionData]);
 
-        // Update Bank Account
-        const accountRef = doc(firestore, `users/${user.uid}/bankAccounts`, accountId);
-        const accountDoc = await transaction.get(accountRef);
-        if (!accountDoc.exists()) throw "Bank account not found";
-        const newBalance = accountDoc.data().saldo + amountPaid;
-        transaction.update(accountRef, { saldo: newBalance });
+    // Update Bank Account
+    setBankAccounts(prev => prev.map(acc => {
+      if(acc.id === accountId) {
+        return {...acc, saldo: acc.saldo + amountPaid};
+      }
+      return acc;
+    }));
 
-        // Update Loan Installment
-        const loanRef = doc(firestore, `users/${user.uid}/loans`, loanId);
-        const newInstallments = loan.installments.map(i => {
-            if (i.id === installmentId) {
-                const newPaidAmount = (i.paidAmount || 0) + amountPaid;
-                const isFullyPaid = newPaidAmount >= i.originalAmount;
-                return { ...i, paidAmount: newPaidAmount, status: isFullyPaid ? 'Paga' as const : 'Pendente' as const };
+
+    // Update Loan and customer
+    setLoans(prevLoans => {
+      const newLoans = prevLoans.map(l => {
+          if (l.id === loanId) {
+              const newInstallments = l.installments.map(i => {
+                  if (i.id === installmentId) {
+                      const newPaidAmount = (i.paidAmount || 0) + amountPaid;
+                      const isFullyPaid = newPaidAmount >= i.originalAmount;
+                      return { ...i, paidAmount: newPaidAmount, status: isFullyPaid ? 'Paga' as const : 'Pendente' as const };
+                  }
+                  return i;
+              });
+
+              const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
+              const newLoanStatus = allInstallmentsPaid ? 'Pago' : 'Em dia';
+              return { ...l, installments: newInstallments, status: newLoanStatus };
+          }
+          return l;
+      });
+
+      const updatedLoan = newLoans.find(l => l.id === loanId);
+      if(updatedLoan) {
+        setCustomers(prevCustomers => {
+          return prevCustomers.map(c => {
+            if(c.id === updatedLoan.customerId){
+              const allCustomerLoans = newLoans.filter(l => l.customerId === c.id);
+              const allPaid = allCustomerLoans.every(l => l.status === 'Pago');
+              return {...c, loanStatus: allPaid ? 'Pago' : 'Ativo'};
             }
-            return i;
+            return c;
+          })
         });
+      }
 
-        const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
-        const newLoanStatus = allInstallmentsPaid ? 'Pago' : 'Em dia';
-        transaction.update(loanRef, { installments: newInstallments, status: newLoanStatus });
-
-        // Update customer status
-        const customerRef = doc(firestore, `users/${user.uid}/customers`, customer.id);
-        const allCustomerLoans = loans.filter(l => l.customerId === customer.id);
-        if (allCustomerLoans.every(l => l.id === loanId ? newLoanStatus === 'Pago' : l.status === 'Pago')) {
-            transaction.update(customerRef, { loanStatus: 'Pago' });
-        } else {
-            transaction.update(customerRef, { loanStatus: 'Ativo' });
-        }
-    }).catch(err => console.error("Payment failed", err));
+      return newLoans;
+    });
 
     setCreditDialogOpen(false);
   };
   
   const handleRevertPayment = (loanId: string, installmentId: string) => {
-    if (!firestore || !user || !transactions) return;
-
-    runTransaction(firestore, async (transaction) => {
-        const transactionToRevertQuery = (transactions || []).filter(t => t.sourceId === `loan:${loanId}-installment:${installmentId}`);
+     const transactionsToRevert = transactions.filter(t => t.sourceId === `loan:${loanId}-installment:${installmentId}`);
         
-        for (const transToRevert of transactionToRevertQuery) {
-            // Revert bank account balances
-            const accountRef = doc(firestore, `users/${user.uid}/bankAccounts`, transToRevert.accountId);
-            const accountDoc = await transaction.get(accountRef);
-            if (!accountDoc.exists()) throw "Bank account not found";
-            const newBalance = accountDoc.data().saldo - transToRevert.amount;
-            transaction.update(accountRef, { saldo: newBalance });
+      for (const transToRevert of transactionsToRevert) {
+          // Revert bank account balances
+          setBankAccounts(prev => prev.map(acc => {
+            if (acc.id === transToRevert.accountId) {
+              return {...acc, saldo: acc.saldo - transToRevert.amount};
+            }
+            return acc;
+          }));
 
-            // Remove transaction
-            const transactionRef = doc(firestore, `users/${user.uid}/transactions`, transToRevert.id);
-            transaction.delete(transactionRef);
+          // Remove transaction
+          setTransactions(prev => prev.filter(t => t.id !== transToRevert.id));
+      }
+
+      // Revert installment status and amount
+      setLoans(prev => prev.map(l => {
+        if(l.id === loanId) {
+          const newInstallments = l.installments.map(i => {
+            if (i.id === installmentId) {
+              return { ...i, status: 'Pendente' as const, paidAmount: 0 };
+            }
+            return i;
+          });
+          return {...l, installments: newInstallments, status: 'Em dia' };
         }
-
-        // Revert installment status and amount
-        const loanRef = doc(firestore, `users/${user.uid}/loans`, loanId);
-        const loanDoc = await transaction.get(loanRef);
-        if (!loanDoc.exists()) throw "Loan not found";
-        const loanData = loanDoc.data() as Loan;
-        
-        const newInstallments = loanData.installments.map(i => {
-          if (i.id === installmentId) {
-            return { ...i, status: 'Pendente' as const, paidAmount: 0 };
-          }
-          return i;
-        });
-        
-        transaction.update(loanRef, { installments: newInstallments, status: 'Em dia' });
-    }).catch(err => console.error("Revert payment failed", err));
+        return l;
+      }));
   };
 
   const toggleCustomer = (customerId: string) => {

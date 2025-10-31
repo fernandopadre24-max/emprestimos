@@ -26,16 +26,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import type { Customer, Loan, BankAccount } from "@/lib/types";
-import { generateInstallments } from "@/lib/data";
+import { generateInstallments, customers as mockCustomers, bankAccounts as mockBankAccounts } from "@/lib/data";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/firebase/auth/use-user"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, addDoc, doc, updateDoc, deleteDoc, getDocs } from "firebase/firestore"
-import { errorEmitter } from "@/firebase/error-emitter"
-import { FirestorePermissionError } from "@/firebase/errors"
 
 
 const formSchema = z.object({
@@ -56,25 +51,15 @@ interface Simulation {
 export default function LoanForm() {
   const { toast } = useToast();
   const router = useRouter();
-  const { user } = useUser();
-  const firestore = useFirestore();
 
-  const customersQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, `users/${user.uid}/customers`) : null, [firestore, user]);
-  const { data: customers } = useCollection<Customer>(customersQuery);
-
+  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [availableBalance, setAvailableBalance] = useState<number>(0);
 
   useEffect(() => {
-    if (!firestore || !user) return;
-    const getBalance = async () => {
-        const accountsCollection = collection(firestore, `users/${user.uid}/bankAccounts`);
-        const accountsSnapshot = await getDocs(accountsCollection);
-        const totalBalance = accountsSnapshot.docs.reduce((acc, doc) => acc + (doc.data() as BankAccount).saldo, 0);
-        setAvailableBalance(totalBalance);
-    };
-    getBalance();
-  }, [firestore, user]);
+    const totalBalance = mockBankAccounts.reduce((acc, doc) => acc + doc.saldo, 0);
+    setAvailableBalance(totalBalance);
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -112,8 +97,6 @@ export default function LoanForm() {
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore || !user || !customers) return;
-
     if (values.amount > availableBalance) {
         toast({
             variant: "destructive",
@@ -122,12 +105,6 @@ export default function LoanForm() {
         });
         return;
     }
-
-
-    const loansCollection = collection(firestore, `users/${user.uid}/loans`);
-    const loansSnapshot = await getDocs(loansCollection);
-    const nextLoanNumber = loansSnapshot.size + 1;
-    const newLoanCode = `CS-${nextLoanNumber.toString().padStart(3, '0')}`;
 
     const customer = customers.find(c => c.id === values.customerId);
     
@@ -140,27 +117,8 @@ export default function LoanForm() {
         return;
     }
     
-    const newLoanRaw: Omit<Loan, 'id' | 'installments'> = {
-        loanCode: newLoanCode,
-        customerId: customer.id,
-        amount: values.amount,
-        interestRate: values.interestRate / 100, // Store as decimal
-        term: values.term,
-        lateFeeRate: values.lateFeeRate / 100, // Store as decimal
-        startDate: values.startDate.toISOString(),
-        status: 'Em dia',
-    };
-    
-    const loanDocRef = doc(loansCollection);
-    const newLoan: Loan = {
-      ...newLoanRaw,
-      id: loanDocRef.id,
-      installments: generateInstallments({ ...newLoanRaw, id: loanDocRef.id })
-    }
-
-    addDoc(loansCollection, newLoan)
-        .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: loansCollection.path, operation: 'create', requestResourceData: newLoan })));
-
+    // In a real app, you would save this to your state management or API
+    console.log("New Loan Submitted:", values);
 
     toast({
       title: "Solicitação Enviada!",
@@ -192,7 +150,7 @@ export default function LoanForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(customers || []).map(customer => (
+                      {customers.map(customer => (
                         <SelectItem key={customer.id} value={customer.id}>
                           {customer.name} ({customer.cpf})
                         </SelectItem>
