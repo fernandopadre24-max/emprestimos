@@ -55,9 +55,11 @@ const MainSidebar = () => {
       <SidebarFooter className="p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-             <SidebarMenuButton tooltip={{ children: "Configurações" }}>
-                <Settings className="h-4 w-4" />
-                <span>Configurações</span>
+             <SidebarMenuButton asChild tooltip={{ children: "Configurações" }} isActive={pathname === "/settings"}>
+                <Link href="/settings">
+                    <Settings className="h-4 w-4" />
+                    <span>Configurações</span>
+                </Link>
               </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
