@@ -205,24 +205,29 @@ export default function EmprestimosPage() {
 
     // Update Loan Installment
     const newLoans = loans.map(l => {
-        if (l.id === loanId) {
-            const newInstallments = l.installments.map(i => {
-                if (i.id === installmentId) {
-                    const newPaidAmount = (i.paidAmount || 0) + amountPaid;
-                    const isFullyPaid = newPaidAmount >= i.originalAmount;
+      if (l.id === loanId) {
+        const newInstallments = l.installments.map(i => {
+          if (i.id === installmentId) {
+            const newPaidAmount = (i.paidAmount || 0) + amountPaid;
+            const isFullyPaid = newPaidAmount >= i.originalAmount;
 
-                    return { 
-                        ...i, 
-                        paidAmount: newPaidAmount,
-                        status: isFullyPaid ? 'Paga' as const : 'Pendente' as const,
-                    };
-                }
-                return i;
-            });
-            const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
-            return { ...l, installments: newInstallments, status: allInstallmentsPaid ? 'Pago' : 'Em dia' };
-        }
-        return l;
+            return {
+              ...i,
+              paidAmount: newPaidAmount,
+              status: isFullyPaid ? 'Paga' as const : 'Pendente' as const,
+            };
+          }
+          return i;
+        });
+
+        const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
+        return {
+          ...l,
+          installments: newInstallments,
+          status: allInstallmentsPaid ? 'Pago' : 'Em dia'
+        };
+      }
+      return l;
     });
     updateAndStoreLoans(newLoans);
 
@@ -430,7 +435,7 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {finalAmountDue !== undefined && finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                                 {isOverdue && installment.status !== 'Paga' && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
@@ -477,4 +482,5 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
 
