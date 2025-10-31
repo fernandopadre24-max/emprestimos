@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -360,7 +361,8 @@ const {
   XAxis,
   YAxis,
   Bar,
-  CartesianGrid
+  CartesianGrid,
+  ResponsiveContainer,
 } = RechartsPrimitive;
 
 
@@ -376,4 +378,7 @@ export {
   YAxis,
   Bar,
   CartesianGrid,
+  ResponsiveContainer,
 };
+
+    

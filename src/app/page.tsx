@@ -17,6 +17,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  ResponsiveContainer,
 } from "@/components/ui/chart"
 import {
   Table,
@@ -30,9 +31,9 @@ import { Badge } from "@/components/ui/badge"
 import { loans as initialLoans, customers as initialCustomers, chartData, transactions as initialTransactions, bankAccounts as initialBankAccounts } from "@/lib/data"
 import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, getMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -40,6 +41,14 @@ const chartConfig = {
   emprestimos: {
     label: "Empréstimos",
     color: "hsl(var(--primary))",
+  },
+  receitas: {
+    label: "Receitas",
+    color: "hsl(var(--chart-2))",
+  },
+  despesas: {
+    label: "Despesas",
+    color: "hsl(var(--chart-5))",
   },
 } satisfies ChartConfig
 
@@ -61,6 +70,26 @@ export default function Dashboard() {
     setBankAccounts(storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts);
 
   }, []);
+  
+  const balanceChartData = useMemo(() => {
+    const monthlyData: { month: string; receitas: number; despesas: number }[] = Array.from({ length: 12 }, (_, i) => ({
+      month: format(new Date(2024, i, 1), "MMM", { locale: ptBR }),
+      receitas: 0,
+      despesas: 0,
+    }));
+
+    transactions.forEach(transaction => {
+      const monthIndex = getMonth(parseISO(transaction.date));
+      if (transaction.type === 'receita') {
+        monthlyData[monthIndex].receitas += transaction.amount;
+      } else {
+        monthlyData[monthIndex].despesas += transaction.amount;
+      }
+    });
+
+    return monthlyData;
+  }, [transactions]);
+
 
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
   const totalCustomers = customers.length
@@ -275,26 +304,26 @@ export default function Dashboard() {
         </Card>
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="font-headline">Distribuição de Empréstimos</CardTitle>
-            <CardDescription>Janeiro - Junho 2024</CardDescription>
+            <CardTitle className="font-headline">Balanço Geral (Receita vs. Despesa)</CardTitle>
+            <CardDescription>Balanço mensal do ano corrente</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
               <ChartContainer config={chartConfig} className="w-full h-[300px]">
-                <BarChart accessibilityLayer data={chartData}>
+                <BarChart accessibilityLayer data={balanceChartData}>
                   <CartesianGrid vertical={false} />
                   <XAxis
                     dataKey="month"
                     tickLine={false}
                     tickMargin={10}
                     axisLine={false}
-                    tickFormatter={(value) => value.slice(0, 3)}
                   />
                   <YAxis />
                   <ChartTooltip
                     cursor={false}
                     content={<ChartTooltipContent indicator="dot" />}
                   />
-                  <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={8} />
+                  <Bar dataKey="receitas" fill="var(--color-receitas)" radius={4} />
+                  <Bar dataKey="despesas" fill="var(--color-despesas)" radius={4} />
                 </BarChart>
               </ChartContainer>
           </CardContent>
@@ -333,3 +362,5 @@ export default function Dashboard() {
     </div>
   )
 }
+
+    
