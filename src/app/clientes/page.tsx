@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
 import {
   Table,
   TableBody,
@@ -20,10 +20,16 @@ import { ChevronDown, FilePenLine, Plus, Trash2 } from "lucide-react"
 import { AddCustomerDialog } from "@/components/clientes/add-customer-dialog"
 import { EditCustomerDialog } from "@/components/clientes/edit-customer-dialog"
 import { cn } from "@/lib/utils"
-import { customers as mockCustomers } from "@/lib/data"
+import { useCollection, useFirestore } from "@/firebase"
+import { collection } from "firebase/firestore"
+import { addCustomer, updateCustomer, deleteCustomer } from "@/lib/customers"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function ClientesPage() {
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const firestore = useFirestore();
+  const customersQuery = useMemo(() => collection(firestore, 'customers'), [firestore]);
+  const { data: customers, isLoading } = useCollection<Customer>(customersQuery);
+
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -31,13 +37,12 @@ export default function ClientesPage() {
 
 
   const handleAddCustomer = async (newCustomerData: Omit<Customer, 'id' | 'registrationDate' | 'loanStatus'>) => {
-    const newCustomer: Customer = {
-      id: `C${Date.now()}`,
+    const newCustomer: Omit<Customer, 'id'> = {
+      ...newCustomerData,
       registrationDate: new Date().toISOString(),
       loanStatus: 'Ativo',
-      ...newCustomerData
     };
-    setCustomers(prev => [...prev, newCustomer]);
+    addCustomer(firestore, newCustomer);
     setAddDialogOpen(false);
   }
 
@@ -48,12 +53,12 @@ export default function ClientesPage() {
   
   const handleEditCustomer = async (editedCustomerData: Partial<Customer>) => {
     if (!selectedCustomer) return;
-    setCustomers(prev => prev.map(cust => cust.id === selectedCustomer.id ? {...cust, ...editedCustomerData} : cust));
+    updateCustomer(firestore, selectedCustomer.id, editedCustomerData);
     setEditDialogOpen(false);
   }
 
   const handleDeleteCustomer = (customerId: string) => {
-    setCustomers(prev => prev.filter(cust => cust.id !== customerId));
+    deleteCustomer(firestore, customerId);
   }
 
   const toggleRow = (id: string) => {
@@ -90,7 +95,18 @@ export default function ClientesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer: Customer) => {
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell className="w-12"><Skeleton className="h-8 w-8 rounded" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
+                </TableRow>
+              ))}
+              {!isLoading && customers?.map((customer: Customer) => {
                 const isExpanded = expandedRows.includes(customer.id);
                 const date = parseISO(customer.registrationDate);
                 return (

@@ -1,7 +1,76 @@
 {
-  "entities": {},
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "Represents a customer who can apply for loans.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the customer."
+        },
+        "name": {
+          "type": "string",
+          "description": "The customer's full name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The customer's email address."
+        },
+        "cpf": {
+          "type": "string",
+          "description": "The customer's CPF (Brazilian individual taxpayer registry)."
+        },
+        "address": {
+          "type": "string",
+          "description": "The customer's street address."
+        },
+        "postalCode": {
+          "type": "string",
+          "description": "The customer's postal code."
+        },
+        "houseNumber": {
+          "type": "string",
+          "description": "The customer's house number."
+        },
+        "city": {
+          "type": "string",
+          "description": "The customer's city."
+        },
+        "registrationDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date the customer was registered."
+        },
+        "loanStatus": {
+          "type": "string",
+          "enum": [
+            "Ativo",
+            "Pago",
+            "Inadimplente"
+          ],
+          "description": "The current status of the customer's loans."
+        }
+      },
+      "required": [
+        "name",
+        "email",
+        "cpf",
+        "registrationDate",
+        "loanStatus"
+      ]
+    }
+  },
   "auth": {
     "providers": []
   },
-  "firestore": {}
+  "firestore": {
+    "/customers/{customerId}": {
+      "schema": {
+        "$ref": "#/entities/Customer"
+      },
+      "description": "Stores customer profile information."
+    }
+  }
 }
