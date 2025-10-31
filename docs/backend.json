@@ -1,0 +1,138 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's public profile information.",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "photoURL": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the user's profile picture."
+        }
+      }
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Represents a customer who can take out loans.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "cpf": { "type": "string" },
+        "address": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "houseNumber": { "type": "string" },
+        "city": { "type": "string" },
+        "registrationDate": { "type": "string", "format": "date-time" },
+        "loanStatus": { "type": "string", "enum": ["Ativo", "Pago", "Inadimplente"] }
+      },
+      "required": ["name", "email", "cpf", "registrationDate", "loanStatus"]
+    },
+    "Loan": {
+      "title": "Loan",
+      "description": "Represents a loan given to a customer.",
+      "type": "object",
+      "properties": {
+        "loanCode": { "type": "string" },
+        "customerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "interestRate": { "type": "number" },
+        "term": { "type": "number" },
+        "lateFeeRate": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Em dia", "Atrasado", "Pago"] }
+      },
+      "required": ["loanCode", "customerId", "amount", "interestRate", "term", "startDate", "status"]
+    },
+    "Installment": {
+        "title": "Installment",
+        "description": "Represents a single installment of a loan.",
+        "type": "object",
+        "properties": {
+            "loanId": { "type": "string" },
+            "installmentNumber": { "type": "number" },
+            "amount": { "type": "number" },
+            "originalAmount": { "type": "number" },
+            "paidAmount": { "type": "number" },
+            "dueDate": { "type": "string", "format": "date-time" },
+            "status": { "type": "string", "enum": ["Paga", "Pendente"] }
+        },
+        "required": ["loanId", "installmentNumber", "amount", "dueDate", "status"]
+    },
+    "BankAccount": {
+      "title": "Bank Account",
+      "description": "Represents a user's bank account.",
+      "type": "object",
+      "properties": {
+        "banco": { "type": "string" },
+        "agencia": { "type": "string" },
+        "conta": { "type": "string" },
+        "saldo": { "type": "number" }
+      },
+      "required": ["banco", "agencia", "conta", "saldo"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Represents a financial transaction.",
+      "type": "object",
+      "properties": {
+        "accountId": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["receita", "despesa"] },
+        "category": { "type": "string" },
+        "sourceId": { "type": "string" }
+      },
+      "required": ["accountId", "description", "amount", "date", "type"]
+    },
+    "Category": {
+        "title": "Category",
+        "description": "Represents a transaction category.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "type": { "type": "string", "enum": ["receita", "despesa"] }
+        },
+        "required": ["name", "type"]
+    }
+  },
+  "auth": {
+    "providers": ["anonymous"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores public profile information for each user."
+    },
+    "/users/{userId}/customers": {
+        "schema": { "$ref": "#/entities/Customer" },
+        "description": "Stores customer data for each user."
+    },
+    "/users/{userId}/loans": {
+        "schema": { "$ref": "#/entities/Loan" },
+        "description": "Stores loan data for each user."
+    },
+    "/users/{userId}/loans/{loanId}/installments": {
+        "schema": { "$ref": "#/entities/Installment" },
+        "description": "Stores installment data for each loan."
+    },
+    "/users/{userId}/bankAccounts": {
+        "schema": { "$ref": "#/entities/BankAccount" },
+        "description": "Stores bank account data for each user."
+    },
+    "/users/{userId}/transactions": {
+        "schema": { "$ref": "#/entities/Transaction" },
+        "description": "Stores transaction data for each user."
+    },
+    "/users/{userId}/categories": {
+        "schema": { "$ref": "#/entities/Category" },
+        "description": "Stores category data for each user."
+    }
+  }
+}

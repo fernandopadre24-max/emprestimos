@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // DISALLOW all reads and writes by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Allow users to read and write their own profile
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Allow users to manage their own data in subcollections
+    match /users/{userId}/{collection}/{docId} {
+      allow read, write, delete: if isOwner(userId);
+    }
+  }
+}
