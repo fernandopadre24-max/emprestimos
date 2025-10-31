@@ -27,12 +27,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { loans as initialLoans, customers as initialCustomers, chartData } from "@/lib/data"
-import type { Loan, Customer } from "@/lib/types"
+import { loans as initialLoans, customers as initialCustomers, chartData, transactions as initialTransactions } from "@/lib/data"
+import type { Loan, Customer, Transaction } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useState, useEffect } from "react"
+import { ArrowDownCircle, ArrowUpCircle } from "lucide-react"
 
 const chartConfig = {
   emprestimos: {
@@ -44,13 +45,16 @@ const chartConfig = {
 export default function Dashboard() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
     const storedLoans = localStorage.getItem("loans");
     const storedCustomers = localStorage.getItem("customers");
+    const storedTransactions = localStorage.getItem("transactions");
 
     setLoans(storedLoans ? JSON.parse(storedLoans) : initialLoans);
     setCustomers(storedCustomers ? JSON.parse(storedCustomers) : initialCustomers);
+    setTransactions(storedTransactions ? JSON.parse(storedTransactions) : initialTransactions);
   }, []);
 
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
@@ -69,11 +73,19 @@ export default function Dashboard() {
     return acc + loanProfit;
   }, 0);
   const recentLoans = loans.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 5);
+  
+  const totalReceitas = transactions
+    .filter(t => t.type === 'receita')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const totalDespesas = transactions
+    .filter(t => t.type === 'despesa')
+    .reduce((acc, t) => acc + t.amount, 0);
 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -155,6 +167,42 @@ export default function Dashboard() {
             </p>
           </CardContent>
         </Card>
+        <Card className="bg-green-100/50 border-green-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-green-800">
+                Total Receitas
+              </CardTitle>
+              <ArrowUpCircle className="h-5 w-5 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-headline text-green-800">
+                {totalReceitas.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </div>
+              <p className="text-xs text-green-700">
+                Soma de todas as receitas
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-red-100/50 border-red-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-red-800">
+                Total Despesas
+              </CardTitle>
+              <ArrowDownCircle className="h-5 w-5 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-headline text-red-800">
+                {totalDespesas.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </div>
+              <p className="text-xs text-red-700">Soma de todas as despesas</p>
+            </CardContent>
+          </Card>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
@@ -233,3 +281,5 @@ export default function Dashboard() {
     </div>
   )
 }
+
+    
