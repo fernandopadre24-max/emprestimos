@@ -32,17 +32,6 @@ function initializeFirebase(options: FirebaseOptions = firebaseConfig): {
   const auth = getAuth(app);
   const firestore = getFirestore(app);
 
-  if (process.env.NODE_ENV === "development") {
-    // Point to the emulators running on localhost.
-    try {
-      connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-      connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
-    } catch (e) {
-      console.error("Error connecting to Firebase emulators. Is it running?", e);
-    }
-  }
-
-
   return { app, auth, firestore };
 }
 
