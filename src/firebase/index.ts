@@ -8,13 +8,8 @@ import {
 
 import { firebaseConfig } from './config';
 
-let app: FirebaseApp;
-let auth: Auth;
-let firestore: Firestore;
-
-// Variáveis para garantir que os emuladores sejam conectados apenas uma vez.
-let authEmulatorConnected = false;
-let firestoreEmulatorConnected = false;
+// Flag to ensure emulators are connected only once
+let emulatorsConnected = false;
 
 /**
  * Initializes the Firebase app and returns the app, auth, and firestore instances.
@@ -25,37 +20,26 @@ let firestoreEmulatorConnected = false;
  * @returns An object containing the Firebase app, auth, and firestore instances.
  */
 export async function initializeFirebase() {
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    firestore = getFirestore(app);
-  } else {
-    app = getApp();
-    auth = getAuth(app);
-    firestore = getFirestore(app);
-  }
+  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  const auth = getAuth(app);
+  const firestore = getFirestore(app);
 
-  if (process.env.NODE_ENV === 'development') {
-    // Conecta ao emulador de autenticação se ainda não estiver conectado.
-    if (!authEmulatorConnected) {
-      try {
-        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-        console.log('Firebase Auth emulator connected.');
-        authEmulatorConnected = true;
-      } catch (e) {
-        console.error('Error connecting to Firebase Auth emulator', e);
-      }
+  if (process.env.NODE_ENV === 'development' && !emulatorsConnected) {
+    console.log('Connecting to Firebase emulators...');
+    try {
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      console.log('Firebase Auth emulator connected.');
+    } catch (e) {
+      console.error('Error connecting to Firebase Auth emulator', e);
     }
-    // Conecta ao emulador do Firestore se ainda não estiver conectado.
-    if (!firestoreEmulatorConnected) {
-       try {
-        connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
-        console.log('Firestore emulator connected.');
-        firestoreEmulatorConnected = true;
-       } catch (e) {
-        console.error('Error connecting to Firestore emulator', e);
-       }
+    
+    try {
+      connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+      console.log('Firestore emulator connected.');
+    } catch (e) {
+      console.error('Error connecting to Firestore emulator', e);
     }
+    emulatorsConnected = true;
   }
 
   return { app, auth, firestore };
