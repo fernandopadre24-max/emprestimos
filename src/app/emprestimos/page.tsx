@@ -96,23 +96,23 @@ export default function EmprestimosPage() {
   }
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
-      const amountDue = (installment.originalAmount || installment.amount) - (installment.paidAmount || 0);
-      if (installment.status === 'Paga' || amountDue <= 0) {
-          return 0; 
-      }
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const dueDate = parseISO(installment.dueDate);
-  
-      if (today > dueDate) {
-          const daysOverdue = differenceInDays(today, dueDate);
-          if (daysOverdue > 0) {
-              const lateFeeRate = loan.lateFeeRate || 0;
-              const lateFee = amountDue * lateFeeRate * daysOverdue;
-              return amountDue + lateFee;
-          }
-      }
-      return amountDue;
+    const amountDue = (installment.originalAmount || installment.amount) - (installment.paidAmount || 0);
+    if (installment.status === 'Paga' || amountDue <= 0) {
+        return 0;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = parseISO(installment.dueDate);
+
+    if (today > dueDate) {
+        const daysOverdue = differenceInDays(today, dueDate);
+        if (daysOverdue > 0) {
+            const lateFeeRate = loan.lateFeeRate || 0;
+            const lateFee = amountDue * lateFeeRate * daysOverdue;
+            return amountDue + lateFee;
+        }
+    }
+    return amountDue;
   };
   
 
@@ -439,7 +439,7 @@ export default function EmprestimosPage() {
                                                                     checked={installment.status === 'Paga'}
                                                                     onCheckedChange={(checked) => handlePaymentToggle(checked, loan, installment)}
                                                                     aria-label={`Marcar parcela ${installment.installmentNumber} como paga`}
-                                                                    disabled={installment.status === 'Paga'}
+                                                                    disabled={installment.status === 'Paga' || finalAmountDue <= 0}
                                                                 />
                                                             </TableCell>
                                                         </TableRow>
@@ -478,16 +478,3 @@ export default function EmprestimosPage() {
     </>
   )
 }
-
-    
-
-    
-
-
-
-
-    
-
-    
-
-
