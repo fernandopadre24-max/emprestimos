@@ -40,7 +40,7 @@ export default function UserNav() {
               Perfil
             </DropdownMenuItem>
           </Link>
-          <Link href="/settings">
+          <Link href="/faturamento">
             <DropdownMenuItem>
               Faturamento
             </DropdownMenuItem>
