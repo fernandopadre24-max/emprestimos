@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -21,12 +22,22 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     auth: null,
     firestore: null,
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Initialize Firebase on the client-side
     const { app, auth, firestore } = initializeFirebase();
     setServices({ app, auth, firestore });
+    setIsLoading(false);
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg">Carregando...</div>
+      </div>
+    );
+  }
 
   return (
     <FirebaseContext.Provider value={services}>
