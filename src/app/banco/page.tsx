@@ -25,6 +25,16 @@ import {
   Plus,
   X,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 import { bankAccounts as initialBankAccounts, transactions as initialTransactions, categories as initialCategories } from "@/lib/data"
 import type { BankAccount, Transaction, NewBankAccount, Category } from "@/lib/types"
@@ -73,6 +83,8 @@ export default function BancoPage() {
   const [isTransactionOpen, setTransactionOpen] = useState(false);
   const [isEditTransactionOpen, setEditTransactionOpen] = useState(false);
   const [isManageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+  const [isDeleteTransactionAlertOpen, setDeleteTransactionAlertOpen] = useState(false);
+
 
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
@@ -239,6 +251,40 @@ export default function BancoPage() {
     setEditTransactionOpen(false);
     setSelectedTransaction(null);
   };
+
+  const handleDeleteTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setDeleteTransactionAlertOpen(true);
+  }
+
+  const handleDeleteTransaction = () => {
+    if (!selectedTransaction) return;
+
+    if (selectedTransaction.sourceId?.startsWith('loan:')) {
+        alert("Não é possível excluir transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
+        setDeleteTransactionAlertOpen(false);
+        return;
+    }
+
+    // Revert account balance
+    const updatedAccounts = bankAccounts.map(account => {
+        if (account.id === selectedTransaction.accountId) {
+            const newBalance = selectedTransaction.type === 'receita'
+                ? account.saldo - selectedTransaction.amount
+                : account.saldo + selectedTransaction.amount;
+            return { ...account, saldo: newBalance };
+        }
+        return account;
+    });
+    updateAndStoreBankAccounts(updatedAccounts);
+
+    // Remove transaction
+    const updatedTransactions = transactions.filter(t => t.id !== selectedTransaction.id);
+    updateAndStoreTransactions(updatedTransactions);
+
+    setDeleteTransactionAlertOpen(false);
+    setSelectedTransaction(null);
+  }
 
   const handleAddCategory = (category: Omit<Category, 'id'>) => {
     const newCategory: Category = {
@@ -518,6 +564,9 @@ export default function BancoPage() {
                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTransactionClick(tx)}>
                                                         <FilePenLine className="h-4 w-4" />
                                                     </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteTransactionClick(tx)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
                                                   </div>
                                                 </TableCell>
                                             </TableRow>
@@ -575,6 +624,23 @@ export default function BancoPage() {
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
       />
+      <AlertDialog open={isDeleteTransactionAlertOpen} onOpenChange={setDeleteTransactionAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+                Esta ação não pode ser desfeita. Isso irá excluir permanentemente a transação e reverter o valor no saldo da conta.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </>
   )
 }
+
+    
