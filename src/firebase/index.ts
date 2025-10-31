@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, type Auth } from 'firebase/auth';
 import {
@@ -9,35 +10,45 @@ import {
 import { firebaseConfig } from './config';
 
 let app: FirebaseApp;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
+let auth: Auth;
+let firestore: Firestore;
 
-const auth = getAuth(app);
-const firestore = getFirestore(app);
+// This function ensures Firebase is initialized only once.
+function initializeFirebaseServices() {
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApp();
+  }
+  auth = getAuth(app);
+  firestore = getFirestore(app);
 
-if (process.env.NODE_ENV === 'development') {
-  // Use um objeto para rastrear o status da conexão para evitar múltiplas conexões
-  if (!(global as any)._firebaseEmulatorsConnected) {
-    console.log('Conectando aos emuladores do Firebase...');
+  // Connect to emulators in development.
+  // The `_firebaseEmulatorsConnected` global flag prevents multiple connections.
+  if (process.env.NODE_ENV === 'development' && !(global as any)._firebaseEmulatorsConnected) {
     try {
+      console.log('Connecting to Firebase Auth emulator...');
       connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-      console.log('Emulador do Firebase Auth conectado.');
+      console.log('Firebase Auth emulator connected.');
     } catch (e) {
-      console.error('Erro ao conectar ao emulador do Firebase Auth', e);
+      console.error('Failed to connect to Firebase Auth emulator', e);
     }
     
     try {
+      console.log('Connecting to Firestore emulator...');
       connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
-      console.log('Emulador do Firestore conectado.');
+      console.log('Firestore emulator connected.');
     } catch (e) {
-      console.error('Erro ao conectar ao emulador do Firestore', e);
+      console.error('Failed to connect to Firestore emulator', e);
     }
     (global as any)._firebaseEmulatorsConnected = true;
   }
+  
+  return { app, auth, firestore };
 }
+
+// Initialize on module load.
+initializeFirebaseServices();
 
 
 /**
