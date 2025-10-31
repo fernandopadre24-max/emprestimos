@@ -62,7 +62,7 @@ export default function SignUpPage() {
       // Create a user profile document in Firestore
       await setDoc(doc(firestore, "users", user.uid), {
         displayName: name,
-        photoURL: null,
+        photoURL: user.photoURL,
       });
 
 
@@ -79,6 +79,8 @@ export default function SignUpPage() {
         description = 'Este e-mail já está em uso.';
       } else if (error.code === 'auth/weak-password') {
         description = 'A senha deve ter no mínimo 6 caracteres.';
+      } else if (error.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') {
+        description = 'A chave da API do Firebase não é válida. Verifique sua configuração.';
       }
       toast({
         variant: 'destructive',
@@ -140,12 +142,6 @@ export default function SignUpPage() {
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Cadastrar
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Já tem uma conta?{' '}
-            <Link href="/login" className="underline hover:text-primary">
-              Faça login
-            </Link>
-          </p>
         </CardFooter>
       </Card>
     </div>

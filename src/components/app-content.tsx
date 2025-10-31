@@ -13,7 +13,7 @@ export function AppContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useUser();
   const router = useRouter();
 
-  const isAuthPage = pathname === '/login' || pathname === '/signup';
+  const isAuthPage = pathname === '/signup';
 
   if (loading) {
     // You can return a global loading spinner here
@@ -38,11 +38,11 @@ export function AppContent({ children }: { children: React.ReactNode }) {
   
   if(!user && !isAuthPage) {
     if (typeof window !== 'undefined') {
-        router.push('/login');
+        router.push('/signup');
     }
      return (
         <div className="flex h-screen w-full items-center justify-center">
-            <p>Redirecionando para login...</p>
+            <p>Redirecionando para cadastro...</p>
         </div>
     );
   }

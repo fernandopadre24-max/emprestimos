@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -14,14 +15,17 @@ import {
 import { useAuth, useUser } from "@/firebase"
 import { signOut } from "firebase/auth"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export default function UserNav() {
   const auth = useAuth();
   const { user, loading } = useUser();
+  const router = useRouter();
 
   const handleSignOut = async () => {
     if (auth) {
       await signOut(auth);
+      router.push('/signup');
     }
   }
 
@@ -30,11 +34,7 @@ export default function UserNav() {
   }
   
   if (!user) {
-    return (
-      <Button asChild>
-        <Link href="/login">Login</Link>
-      </Button>
-    )
+    return null
   }
 
   return (
