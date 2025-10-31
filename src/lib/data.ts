@@ -1,15 +1,16 @@
 
 
 
+
 import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount, Transaction, Installment } from '@/lib/types';
 import { addMonths, formatISO } from 'date-fns';
 
 export const customers: Customer[] = [
-  { id: '1', name: 'João Silva', email: 'joao.silva@example.com', cpf: '123.456.789-01', registrationDate: '2023-01-15', loanStatus: 'Ativo' },
-  { id: '2', name: 'Maria Oliveira', email: 'maria.o@example.com', cpf: '234.567.890-12', registrationDate: '2023-02-20', loanStatus: 'Pago' },
-  { id: '3', name: 'Carlos Pereira', email: 'carlos.p@example.com', cpf: '345.678.901-23', registrationDate: '2023-03-10', loanStatus: 'Ativo' },
-  { id: '4', name: 'Ana Costa', email: 'ana.costa@example.com', cpf: '456.789.012-34', registrationDate: '2023-04-05', loanStatus: 'Inadimplente' },
-  { id: '5', name: 'Pedro Martins', email: 'pedro.m@example.com', cpf: '567.890.123-45', registrationDate: '2023-05-25', loanStatus: 'Ativo' },
+  { id: '1', name: 'João Silva', email: 'joao.silva@example.com', cpf: '123.456.789-01', address: 'Rua das Flores', postalCode: '12345-678', houseNumber: '123', city: 'São Paulo', registrationDate: '2023-01-15', loanStatus: 'Ativo' },
+  { id: '2', name: 'Maria Oliveira', email: 'maria.o@example.com', cpf: '234.567.890-12', address: 'Avenida Brasil', postalCode: '23456-789', houseNumber: '456', city: 'Rio de Janeiro', registrationDate: '2023-02-20', loanStatus: 'Pago' },
+  { id: '3', name: 'Carlos Pereira', email: 'carlos.p@example.com', cpf: '345.678.901-23', address: 'Praça da Sé', postalCode: '34567-890', houseNumber: '789', city: 'Belo Horizonte', registrationDate: '2023-03-10', loanStatus: 'Ativo' },
+  { id: '4', name: 'Ana Costa', email: 'ana.costa@example.com', cpf: '456.789.012-34', address: 'Rua do Sol', postalCode: '45678-901', houseNumber: '101', city: 'Salvador', registrationDate: '2023-04-05', loanStatus: 'Inadimplente' },
+  { id: '5', name: 'Pedro Martins', email: 'pedro.m@example.com', cpf: '567.890.123-45', address: 'Avenida das Nações', postalCode: '56789-012', houseNumber: '212', city: 'Brasília', registrationDate: '2023-05-25', loanStatus: 'Ativo' },
 ];
 
 export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installment[] => {

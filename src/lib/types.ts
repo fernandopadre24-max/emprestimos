@@ -5,6 +5,10 @@ export interface Customer {
   name: string;
   email: string;
   cpf: string;
+  address: string;
+  postalCode: string;
+  houseNumber: string;
+  city: string;
   registrationDate: string;
   loanStatus: 'Ativo' | 'Pago' | 'Inadimplente';
 }

@@ -92,7 +92,7 @@ export default function ClientesPage() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead className="hidden sm:table-cell">Email</TableHead>
-                <TableHead className="hidden sm:table-cell">CPF</TableHead>
+                <TableHead className="hidden sm:table-cell">Cidade</TableHead>
                 <TableHead className="hidden md:table-cell">Data de Cadastro</TableHead>
                 <TableHead>Status do Empréstimo</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -105,7 +105,7 @@ export default function ClientesPage() {
                 <TableRow key={customer.id}>
                   <TableCell className="font-medium">{customer.name}</TableCell>
                   <TableCell className="hidden sm:table-cell">{customer.email}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{customer.cpf}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{customer.city}</TableCell>
                   <TableCell className="hidden md:table-cell">{format(date, "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                   <TableCell>
                     <Badge variant={customer.loanStatus === 'Ativo' ? 'secondary' : customer.loanStatus === 'Inadimplente' ? 'destructive' : 'default'} className={customer.loanStatus === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
