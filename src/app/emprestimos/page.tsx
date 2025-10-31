@@ -435,7 +435,7 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {finalAmountDue !== undefined && finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {finalAmountDue > 0 && finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                                                 {isOverdue && installment.status !== 'Paga' && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
@@ -484,3 +484,6 @@ export default function EmprestimosPage() {
 }
 
 
+
+
+    
