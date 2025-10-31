@@ -35,7 +35,7 @@ export default function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <Link href="/settings">
+          <Link href="/perfil">
             <DropdownMenuItem>
               Perfil
             </DropdownMenuItem>
