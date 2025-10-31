@@ -22,7 +22,7 @@ const MainSidebar = () => {
   const menuItems = [
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/emprestimos", label: "Empréstimos", icon: Landmark },
-    { href: "/banco", label: "Banco", icon: Banknote },
+    { href: "/banco", label: "Bancos", icon: Banknote },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/relatorios", label: "Relatórios", icon: FileText },
     { href: "/faturamento", label: "Faturamento", icon: Receipt },
