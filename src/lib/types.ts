@@ -1,5 +1,10 @@
 
 
+export interface UserProfile {
+  displayName?: string | null;
+  photoURL?: string | null;
+}
+
 export interface Customer {
   id: string;
   name: string;

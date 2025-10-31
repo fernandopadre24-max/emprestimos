@@ -8,7 +8,8 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -30,10 +31,13 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const auth = useAuth() as Auth;
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSignUp = async () => {
+    if (!firestore) return;
+
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(
@@ -42,9 +46,18 @@ export default function SignUpPage() {
         password
       );
       
-      await updateProfile(userCredential.user, {
+      const user = userCredential.user;
+
+      await updateProfile(user, {
         displayName: name,
       });
+
+      // Create a user profile document in Firestore
+      await setDoc(doc(firestore, "users", user.uid), {
+        displayName: name,
+        photoURL: null,
+      });
+
 
       toast({
         title: 'Cadastro realizado com sucesso!',
