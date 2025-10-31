@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { Upload } from "lucide-react";
 import { useRef, useState } from "react";
@@ -13,6 +15,14 @@ export default function PerfilPage() {
     const userAvatarPlaceholder = PlaceHolderImages.find(p => p.id === "user-avatar");
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { toast } = useToast();
+
+    const [name, setName] = useState("Usuário CredSimples");
+    const [email, setEmail] = useState("usuario@credisimples.com");
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+
 
     const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -28,6 +38,42 @@ export default function PerfilPage() {
     const handleUploadClick = () => {
         fileInputRef.current?.click();
     };
+
+    const handleSaveChanges = () => {
+        toast({
+            title: "Sucesso!",
+            description: "Suas informações foram atualizadas.",
+            className: "bg-accent text-accent-foreground"
+        })
+    }
+
+    const handleUpdatePassword = () => {
+        if (newPassword !== confirmPassword) {
+            toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "As novas senhas não coincidem.",
+            });
+            return;
+        }
+        if (!newPassword || !currentPassword) {
+             toast({
+                variant: "destructive",
+                title: "Erro",
+                description: "Por favor, preencha todos os campos de senha.",
+            });
+            return;
+        }
+        
+        toast({
+            title: "Sucesso!",
+            description: "Sua senha foi atualizada.",
+            className: "bg-accent text-accent-foreground"
+        });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+    }
 
   return (
     <div className="grid gap-6">
@@ -72,15 +118,15 @@ export default function PerfilPage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">Nome</Label>
-                            <Input id="name" defaultValue="Usuário CredSimples" />
+                            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">E-mail</Label>
-                            <Input id="email" type="email" defaultValue="usuario@credisimples.com" />
+                            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                         </div>
                     </CardContent>
                     <CardFooter className="border-t pt-6">
-                        <Button>Salvar Alterações</Button>
+                        <Button onClick={handleSaveChanges}>Salvar Alterações</Button>
                     </CardFooter>
                 </Card>
 
@@ -92,19 +138,19 @@ export default function PerfilPage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="current-password">Senha Atual</Label>
-                            <Input id="current-password" type="password" />
+                            <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="new-password">Nova Senha</Label>
-                            <Input id="new-password" type="password" />
+                            <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                         </div>
                          <div className="space-y-2">
                             <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
-                            <Input id="confirm-password" type="password" />
+                            <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                         </div>
                     </CardContent>
                     <CardFooter className="border-t pt-6">
-                        <Button>Atualizar Senha</Button>
+                        <Button onClick={handleUpdatePassword}>Atualizar Senha</Button>
                     </CardFooter>
                 </Card>
             </div>
