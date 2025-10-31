@@ -208,8 +208,8 @@ export default function EmprestimosPage() {
       if (l.id === loanId) {
         const newInstallments = l.installments.map(i => {
           if (i.id === installmentId) {
-            const newPaidAmount = (i.paidAmount || 0) + amountPaid;
-            const isFullyPaid = newPaidAmount >= i.originalAmount;
+             const newPaidAmount = (i.paidAmount || 0) + amountPaid;
+             const isFullyPaid = newPaidAmount >= i.originalAmount;
 
             return {
               ...i,
@@ -435,7 +435,7 @@ export default function EmprestimosPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                {finalAmountDue > 0 && finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                                {finalAmountDue > 0 ? finalAmountDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : "-"}
                                                                 {isOverdue && installment.status !== 'Paga' && <div className="text-xs text-red-500">Inclui multa por atraso</div>}
                                                             </TableCell>
                                                             <TableCell className="text-right">
@@ -443,7 +443,7 @@ export default function EmprestimosPage() {
                                                                     checked={installment.status === 'Paga'}
                                                                     onCheckedChange={(checked) => handlePaymentToggle(checked, loan, installment)}
                                                                     aria-label={`Marcar parcela ${installment.installmentNumber} como paga`}
-                                                                    disabled={installment.status === 'Paga' || finalAmountDue <= 0}
+                                                                    disabled={finalAmountDue <= 0}
                                                                 />
                                                             </TableCell>
                                                         </TableRow>
@@ -482,8 +482,3 @@ export default function EmprestimosPage() {
     </>
   )
 }
-
-
-
-
-    
