@@ -12,6 +12,10 @@ let app: FirebaseApp;
 let auth: Auth;
 let firestore: Firestore;
 
+// Variáveis para garantir que os emuladores sejam conectados apenas uma vez.
+let authEmulatorConnected = false;
+let firestoreEmulatorConnected = false;
+
 /**
  * Initializes the Firebase app and returns the app, auth, and firestore instances.
  * If the app is already initialized, it returns the existing instances.
@@ -25,23 +29,35 @@ export async function initializeFirebase() {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     firestore = getFirestore(app);
-
-    if (process.env.NODE_ENV === 'development') {
-      // Set up emulators
-      try {
-        // Replace with your actual emulator host and port
-        // connectAuthEmulator(auth, 'http://localhost:9099');
-        // connectFirestoreEmulator(firestore, 'localhost', 8080);
-        console.log('Firebase emulators connected');
-      } catch (e) {
-        console.error('Error connecting to Firebase emulators', e);
-      }
-    }
   } else {
     app = getApp();
     auth = getAuth(app);
     firestore = getFirestore(app);
   }
+
+  if (process.env.NODE_ENV === 'development') {
+    // Conecta ao emulador de autenticação se ainda não estiver conectado.
+    if (!authEmulatorConnected) {
+      try {
+        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+        console.log('Firebase Auth emulator connected.');
+        authEmulatorConnected = true;
+      } catch (e) {
+        console.error('Error connecting to Firebase Auth emulator', e);
+      }
+    }
+    // Conecta ao emulador do Firestore se ainda não estiver conectado.
+    if (!firestoreEmulatorConnected) {
+       try {
+        connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+        console.log('Firestore emulator connected.');
+        firestoreEmulatorConnected = true;
+       } catch (e) {
+        console.error('Error connecting to Firestore emulator', e);
+       }
+    }
+  }
+
   return { app, auth, firestore };
 }
 
