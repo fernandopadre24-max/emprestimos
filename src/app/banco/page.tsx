@@ -203,32 +203,6 @@ export default function BancoPage() {
     setSelectedTransaction(null);
   };
 
-  const handleDeleteTransaction = (transactionId: string) => {
-    const transactionToDelete = transactions.find(t => t.id === transactionId);
-    if (!transactionToDelete) return;
-
-    // Prevent direct deletion of loan-related transactions
-    if (transactionToDelete.sourceId?.startsWith('loan:')) {
-        alert("Não é possível excluir transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
-        return;
-    }
-
-    // Revert balance change
-    const updatedAccounts = bankAccounts.map(account => {
-      if (account.id === transactionToDelete.accountId) {
-        const newBalance = transactionToDelete.type === 'receita' 
-          ? account.saldo - transactionToDelete.amount 
-          : account.saldo + transactionToDelete.amount;
-        return { ...account, saldo: newBalance };
-      }
-      return account;
-    });
-    updateAndStoreBankAccounts(updatedAccounts);
-
-    const updatedTransactions = transactions.filter(t => t.id !== transactionId);
-    updateAndStoreTransactions(updatedTransactions);
-  };
-
   const toggleRow = (id: string) => {
     setExpandedRows(current =>
       current.includes(id) ? current.filter(rowId => rowId !== id) : [...current, id]
@@ -415,9 +389,6 @@ export default function BancoPage() {
                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTransactionClick(tx)}>
                                                         <FilePenLine className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteTransaction(tx.id)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
                                                   </div>
                                                 </TableCell>
                                             </TableRow>
@@ -468,5 +439,7 @@ export default function BancoPage() {
     </>
   )
 }
+
+    
 
     
