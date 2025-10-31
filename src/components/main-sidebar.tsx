@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -12,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { Home, Users, Landmark, FileText, Settings, Banknote, Receipt } from "lucide-react"
+import { Home, Users, Landmark, FileText, Settings, Banknote } from "lucide-react"
 import { Logo } from "@/components/icons"
 import { cn } from "@/lib/utils"
 
@@ -25,7 +24,6 @@ const MainSidebar = () => {
     { href: "/banco", label: "Bancos", icon: Banknote },
     { href: "/clientes", label: "Clientes", icon: Users },
     { href: "/relatorios", label: "Relatórios", icon: FileText },
-    { href: "/faturamento", label: "Faturamento", icon: Receipt },
   ]
 
   return (
