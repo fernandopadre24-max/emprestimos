@@ -18,7 +18,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer,
   LineChart,
   Line,
   AreaChart,
@@ -113,48 +112,6 @@ export default function Dashboard() {
     .reduce((acc, t) => acc + t.amount, 0);
     
   const balancoGeral = totalReceitas - totalDespesas;
-
-
-  const renderChart = () => {
-    const ChartComponent = {
-        bar: BarChart,
-        line: LineChart,
-        area: AreaChart,
-    }[chartType];
-
-    const ChartElement = {
-        bar: Bar,
-        line: Line,
-        area: Area,
-    };
-    
-    const EmprestimosElement = React.createElement(ChartElement[chartType], { dataKey: "emprestimos", fill: "var(--color-emprestimos)", radius: chartType === 'bar' ? 4 : undefined, stroke: "var(--color-emprestimos)" });
-    const ReceitasElement = React.createElement(ChartElement[chartType], { dataKey: "receitas", fill: "var(--color-receitas)", radius: chartType === 'bar' ? 4 : undefined, stroke: "var(--color-receitas)" });
-    const DespesasElement = React.createElement(ChartElement[chartType], { dataKey: "despesas", fill: "var(--color-despesas)", radius: chartType === 'bar' ? 4 : undefined, stroke: "var(--color-despesas)" });
-
-    return (
-        <ChartContainer config={chartConfig} className="w-full h-[300px]">
-            <ChartComponent accessibilityLayer data={balanceChartData}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
-                />
-                <YAxis />
-                <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                />
-                {EmprestimosElement}
-                {ReceitasElement}
-                {DespesasElement}
-            </ChartComponent>
-        </ChartContainer>
-    );
-  };
-
 
   return (
     <div className="flex flex-col gap-4">
@@ -358,7 +315,41 @@ export default function Dashboard() {
                 </div>
             </CardHeader>
             <CardContent className="pl-2">
-                {renderChart()}
+                <ChartContainer config={chartConfig} className="w-full h-[300px]">
+                    {chartType === 'bar' && 
+                        <BarChart data={balanceChartData}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
+                            <YAxis />
+                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                            <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
+                            <Bar dataKey="receitas" fill="var(--color-receitas)" radius={4} />
+                            <Bar dataKey="despesas" fill="var(--color-despesas)" radius={4} />
+                        </BarChart>
+                    }
+                    {chartType === 'line' &&
+                        <LineChart data={balanceChartData}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
+                            <YAxis />
+                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                            <Line dataKey="emprestimos" stroke="var(--color-emprestimos)" />
+                            <Line dataKey="receitas" stroke="var(--color-receitas)" />
+                            <Line dataKey="despesas" stroke="var(--color-despesas)" />
+                        </LineChart>
+                    }
+                    {chartType === 'area' &&
+                        <AreaChart data={balanceChartData}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
+                            <YAxis />
+                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                            <Area dataKey="emprestimos" fill="var(--color-emprestimos)" stroke="var(--color-emprestimos)" />
+                            <Area dataKey="receitas" fill="var(--color-receitas)" stroke="var(--color-receitas)" />
+                            <Area dataKey="despesas" fill="var(--color-despesas)" stroke="var(--color-despesas)" />
+                        </AreaChart>
+                    }
+                </ChartContainer>
             </CardContent>
         </Card>
       </div>
@@ -395,3 +386,5 @@ export default function Dashboard() {
     </div>
   )
 }
+
+    
