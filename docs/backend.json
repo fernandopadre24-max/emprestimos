@@ -144,6 +144,33 @@
         "date",
         "type"
       ]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Represents a transaction category.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the category."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the category."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "receita",
+            "despesa"
+          ],
+          "description": "The type of transaction this category applies to."
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ]
     }
   },
   "auth": {
@@ -167,6 +194,12 @@
         "$ref": "#/entities/Transaction"
       },
       "description": "Stores all transactions for a specific bank account."
+    },
+    "/categories/{categoryId}": {
+      "schema": {
+        "$ref": "#/entities/Category"
+      },
+      "description": "Stores transaction categories."
     }
   }
 }

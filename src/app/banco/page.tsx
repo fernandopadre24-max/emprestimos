@@ -20,7 +20,6 @@ import {
   CreditCard,
   Trash2,
   FilePenLine,
-  ArrowRightLeft,
   Settings,
   Plus,
   X,
@@ -53,9 +52,10 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
 
 import { useCollection, useFirestore } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { collection, query, collectionGroup, getDocs } from "firebase/firestore"
 import { addBankAccount, updateBankAccount, deleteBankAccount } from "@/lib/bank"
 import { addTransaction, updateTransaction, deleteTransaction } from "@/lib/transactions"
+import { addCategory, deleteCategory } from "@/lib/categories"
 import { Skeleton } from "@/components/ui/skeleton"
 
 interface FilterState {
@@ -70,7 +70,7 @@ const initialFilterState: FilterState = {
   dateRange: undefined,
 };
 
-function AccountTransactions({ accountId }: { accountId: string }) {
+function AccountTransactions({ accountId, categories }: { accountId: string, categories: Category[] }) {
   const firestore = useFirestore();
   const transactionsQuery = useMemo(() => {
     return query(collection(firestore, `bankAccounts/${accountId}/transactions`));
@@ -218,7 +218,7 @@ function AccountTransactions({ accountId }: { accountId: string }) {
         onOpenChange={setEditTransactionOpen}
         onSubmit={handleEditTransaction}
         transaction={selectedTransaction}
-        categories={[]} // TODO: Connect categories from Firestore
+        categories={categories}
       />
 
       <AlertDialog open={isDeleteTransactionAlertOpen} onOpenChange={setDeleteTransactionAlertOpen}>
@@ -242,10 +242,10 @@ function AccountTransactions({ accountId }: { accountId: string }) {
 export default function BancoPage() {
   const firestore = useFirestore();
   const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
-  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
-  // TODO: Fetch all transactions for summary calculation
-  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(collection(firestore, 'transactions')); // This collection doesn't exist, needs rework
+  const categoriesQuery = useMemo(() => collection(firestore, 'categories'), [firestore]);
 
+  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+  const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
 
   const [bankSummary, setBankSummary] = useState({
     receitas: 0,
@@ -267,20 +267,27 @@ export default function BancoPage() {
 
   useEffect(() => {
     const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
-    // This summary logic needs to be revisited. We should fetch all transactions from all accounts.
-    // For now, it will be zero as `allTransactions` will be empty.
-    const receitas = (allTransactions || [])
-      .filter(t => t.type === 'receita')
-      .reduce((acc, t) => acc + t.amount, 0);
+    setBankSummary(prev => ({...prev, saldoContas}));
 
-    const despesas = (allTransactions || [])
-      .filter(t => t.type === 'despesa')
-      .reduce((acc, t) => acc + t.amount, 0);
-    
-    const balanco = receitas - despesas;
-    
-    setBankSummary({ saldoContas, receitas, despesas, balanco });
-  }, [bankAccounts, allTransactions]);
+    if (firestore) {
+      const transactionsQuery = query(collectionGroup(firestore, 'transactions'));
+      getDocs(transactionsQuery).then(snapshot => {
+        const allTransactions = snapshot.docs.map(doc => doc.data() as Transaction);
+        
+        const receitas = allTransactions
+          .filter(t => t.type === 'receita')
+          .reduce((acc, t) => acc + t.amount, 0);
+
+        const despesas = allTransactions
+          .filter(t => t.type === 'despesa')
+          .reduce((acc, t) => acc + t.amount, 0);
+        
+        const balanco = receitas - despesas;
+        
+        setBankSummary({ saldoContas, receitas, despesas, balanco });
+      });
+    }
+  }, [bankAccounts, firestore]);
 
 
   const handleTransaction = (account: BankAccount, type: "receita" | "despesa") => {
@@ -310,7 +317,6 @@ export default function BancoPage() {
   }
   
   const handleDeleteAccount = (accountId: string) => {
-    // Note: This doesn't delete sub-collections like transactions.
     deleteBankAccount(firestore, accountId);
   }
 
@@ -321,13 +327,11 @@ export default function BancoPage() {
   }
 
   const handleAddCategory = (category: Omit<Category, 'id'>) => {
-    // TODO: Implement Firestore logic for categories
-    console.log("Add category", category);
+    addCategory(firestore, category);
   }
 
   const handleDeleteCategory = (categoryId: string) => {
-    // TODO: Implement Firestore logic for categories
-    console.log("Delete category", categoryId);
+    deleteCategory(firestore, categoryId);
   }
 
   const toggleRow = (id: string) => {
@@ -335,6 +339,8 @@ export default function BancoPage() {
       current.includes(id) ? current.filter(rowId => rowId !== id) : [...current, id]
     );
   }
+  
+  const isLoading = isLoadingAccounts || isLoadingCategories;
   
   return (
     <>
@@ -430,7 +436,7 @@ export default function BancoPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingAccounts && Array.from({ length: 3 }).map((_, i) => (
+              {isLoading && Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell className="w-12"><Skeleton className="h-8 w-8 rounded" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -440,7 +446,7 @@ export default function BancoPage() {
                   <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
                 </TableRow>
               ))}
-              {!isLoadingAccounts && bankAccounts?.map((account: BankAccount) => {
+              {!isLoading && bankAccounts?.map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
                 return (
                   <React.Fragment key={account.id}>
@@ -476,7 +482,7 @@ export default function BancoPage() {
                     {isExpanded && (
                       <TableRow>
                         <TableCell colSpan={6}>
-                          <AccountTransactions accountId={account.id} />
+                          <AccountTransactions accountId={account.id} categories={categories || []} />
                         </TableCell>
                       </TableRow>
                     )}
@@ -503,17 +509,17 @@ export default function BancoPage() {
 
       <NewTransactionDialog
         isOpen={isTransactionOpen}
-        onOpencha-nge={setTransactionOpen}
+        onOpenChange={setTransactionOpen}
         onSubmit={handleNewTransaction}
         transactionType={transactionType}
         account={selectedAccount}
-        categories={[]} // TODO: Connect categories from Firestore
+        categories={categories || []}
       />
       
       <ManageCategoriesDialog
         isOpen={isManageCategoriesOpen}
         onOpenChange={setManageCategoriesOpen}
-        categories={[]} // TODO: Connect categories from Firestore
+        categories={categories || []}
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
       />

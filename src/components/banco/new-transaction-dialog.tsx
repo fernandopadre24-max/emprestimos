@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface NewTransactionDialogProps {
@@ -37,12 +37,18 @@ export function NewTransactionDialog({ isOpen, onOpenChange, onSubmit, transacti
   
   const availableCategories = categories.filter(c => c.type === transactionType);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setDescription("");
+      setAmount('');
+      setCategory(undefined);
+    }
+  }, [isOpen]);
+
   const handleSubmit = () => {
-    if (typeof amount !== 'number') return;
+    if (typeof amount !== 'number' || amount <= 0 || !description) return;
     onSubmit({ description, amount, category });
-    setDescription("");
-    setAmount('');
-    setCategory(undefined);
+    onOpenChange(false);
   }
 
   return (
