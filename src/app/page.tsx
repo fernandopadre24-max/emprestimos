@@ -27,13 +27,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { loans as initialLoans, customers as initialCustomers, chartData, transactions as initialTransactions } from "@/lib/data"
-import type { Loan, Customer, Transaction } from "@/lib/types"
+import { loans as initialLoans, customers as initialCustomers, chartData, transactions as initialTransactions, bankAccounts as initialBankAccounts } from "@/lib/data"
+import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useState, useEffect } from "react"
-import { ArrowDownCircle, ArrowUpCircle } from "lucide-react"
+import { ArrowDownCircle, ArrowUpCircle, CreditCard } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 const chartConfig = {
   emprestimos: {
@@ -46,15 +47,19 @@ export default function Dashboard() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   useEffect(() => {
     const storedLoans = localStorage.getItem("loans");
     const storedCustomers = localStorage.getItem("customers");
     const storedTransactions = localStorage.getItem("transactions");
+    const storedBankAccounts = localStorage.getItem("bankAccounts");
 
     setLoans(storedLoans ? JSON.parse(storedLoans) : initialLoans);
     setCustomers(storedCustomers ? JSON.parse(storedCustomers) : initialCustomers);
     setTransactions(storedTransactions ? JSON.parse(storedTransactions) : initialTransactions);
+    setBankAccounts(storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts);
+
   }, []);
 
   const totalValue = loans.reduce((acc, loan) => acc + loan.amount, 0)
@@ -63,8 +68,6 @@ export default function Dashboard() {
     const principalPerInstallment = loan.amount / loan.term;
     const loanProfit = loan.installments.reduce((installmentAcc, installment) => {
         if (installment.paidAmount > 0) {
-            // A simple approximation of interest is the part of the payment that exceeds the principal for that installment.
-            // This is not entirely accurate for amortization schedules but gives a good estimate of profit from payments.
             const profitFromInstallment = installment.paidAmount - principalPerInstallment;
             return installmentAcc + (profitFromInstallment > 0 ? profitFromInstallment : 0);
         }
@@ -278,6 +281,36 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">Saldos em Contas</CardTitle>
+          <CardDescription>
+            Resumo dos saldos em todas as contas bancárias cadastradas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Banco</TableHead>
+                <TableHead>Conta</TableHead>
+                <TableHead className="text-right">Saldo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bankAccounts.map((account) => (
+                <TableRow key={account.id}>
+                  <TableCell className="font-medium">{account.banco}</TableCell>
+                  <TableCell>{account.agencia} / {account.conta}</TableCell>
+                  <TableCell className={cn("text-right font-medium", account.saldo >= 0 ? 'text-green-600' : 'text-red-600')}>
+                    {account.saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }
