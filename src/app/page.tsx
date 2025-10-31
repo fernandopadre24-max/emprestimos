@@ -33,7 +33,7 @@ import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useState, useEffect } from "react"
-import { ArrowDownCircle, ArrowUpCircle, CreditCard } from "lucide-react"
+import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const chartConfig = {
@@ -84,11 +84,13 @@ export default function Dashboard() {
   const totalDespesas = transactions
     .filter(t => t.type === 'despesa')
     .reduce((acc, t) => acc + t.amount, 0);
+    
+  const balancoGeral = totalReceitas - totalDespesas;
 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -145,7 +147,7 @@ export default function Dashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lucratividade</CardTitle>
+            <CardTitle className="text-sm font-medium">Lucratividade (Juros)</CardTitle>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -204,6 +206,23 @@ export default function Dashboard() {
                 })}
               </div>
               <p className="text-xs text-red-700">Soma de todas as despesas</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-blue-100/50 border-blue-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-blue-800">
+                Balanço Geral
+              </CardTitle>
+              <CircleDollarSign className="h-5 w-5 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-headline text-blue-800">
+                {balancoGeral.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </div>
+              <p className="text-xs text-blue-700">Receitas - Despesas</p>
             </CardContent>
           </Card>
       </div>
@@ -314,5 +333,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
-    
