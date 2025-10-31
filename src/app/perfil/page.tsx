@@ -1,14 +1,34 @@
+"use client"
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { Upload } from "lucide-react";
+import { useRef, useState } from "react";
 
 export default function PerfilPage() {
-    const userAvatar = PlaceHolderImages.find(p => p.id === "user-avatar");
+    const userAvatarPlaceholder = PlaceHolderImages.find(p => p.id === "user-avatar");
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setAvatarPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
   return (
     <div className="grid gap-6">
         <Card>
@@ -26,10 +46,17 @@ export default function PerfilPage() {
                     </CardHeader>
                     <CardContent className="flex flex-col items-center gap-4">
                         <Avatar className="h-32 w-32">
-                           {userAvatar && <AvatarImage src={userAvatar.imageUrl} alt="Avatar do usuário" data-ai-hint={userAvatar.imageHint} />}
+                           <AvatarImage src={avatarPreview || userAvatarPlaceholder?.imageUrl} alt="Avatar do usuário" data-ai-hint={userAvatarPlaceholder?.imageHint} />
                             <AvatarFallback>CS</AvatarFallback>
                         </Avatar>
-                        <Button variant="outline">
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                            accept="image/*"
+                        />
+                        <Button variant="outline" onClick={handleUploadClick}>
                             <Upload className="mr-2 h-4 w-4" />
                             Alterar Foto
                         </Button>
