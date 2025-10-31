@@ -13,9 +13,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Allow users to read and write their own profile
+    // Allow users to read, create, and write their own profile.
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, update, delete: if isOwner(userId);
+      allow create: if request.auth != null && request.auth.uid == userId;
     }
     
     // Allow users to manage their own data in subcollections
