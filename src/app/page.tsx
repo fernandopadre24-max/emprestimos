@@ -39,7 +39,9 @@ import { ptBR } from "date-fns/locale"
 import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { loans as allLoans, customers, transactions, bankAccounts } from "@/lib/data"
+import { useCollection, useFirestore } from "@/firebase"
+import { collection, query, collectionGroup, orderBy, limit } from "firebase/firestore"
+import { Skeleton } from "@/components/ui/skeleton"
 
 
 const chartConfig = {
@@ -58,19 +60,31 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export default function Dashboard() {
+  const firestore = useFirestore();
+
+  const loansQuery = useMemo(() => query(collection(firestore, 'loans'), orderBy('startDate', 'desc')), [firestore]);
+  const customersQuery = useMemo(() => collection(firestore, 'customers'), [firestore]);
+  const transactionsQuery = useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]);
+  const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
+
+  const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
+  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+  const { data: transactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(transactionsQuery);
+  const { data: bankAccounts, isLoading: isLoadingBankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+  
   const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
   
-  const recentLoans = allLoans.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()).slice(0, 5);
+  const recentLoans = useMemo(() => (allLoans || []).slice(0, 5), [allLoans]);
 
   const balanceChartData = useMemo(() => {
     const monthlyData: { month: string; emprestimos: number; receitas: number; despesas: number }[] = Array.from({ length: 12 }, (_, i) => ({
-      month: format(new Date(2024, i, 1), "MMM", { locale: ptBR }),
+      month: format(new Date(new Date().getFullYear(), i, 1), "MMM", { locale: ptBR }),
       emprestimos: 0,
       receitas: 0,
       despesas: 0,
     }));
   
-    transactions.forEach(transaction => {
+    (transactions || []).forEach(transaction => {
       const monthIndex = getMonth(parseISO(transaction.date));
       if (transaction.type === 'receita') {
         monthlyData[monthIndex].receitas += transaction.amount;
@@ -79,7 +93,7 @@ export default function Dashboard() {
       }
     });
 
-    allLoans.forEach(loan => {
+    (allLoans || []).forEach(loan => {
         const monthIndex = getMonth(parseISO(loan.startDate));
         monthlyData[monthIndex].emprestimos += loan.amount;
     });
@@ -88,9 +102,10 @@ export default function Dashboard() {
   }, [transactions, allLoans]);
 
 
-  const totalValue = allLoans.reduce((acc, loan) => acc + loan.amount, 0)
-  const totalCustomers = customers.length
-  const profitability = allLoans.reduce((acc, loan) => {
+  const totalValue = useMemo(() => (allLoans || []).reduce((acc, loan) => acc + loan.amount, 0), [allLoans])
+  const totalCustomers = useMemo(() => (customers || []).length, [customers]);
+  
+  const profitability = useMemo(() => (allLoans || []).reduce((acc, loan) => {
     if (!loan.installments) return acc;
     const principalPerInstallment = loan.amount / loan.term;
     const loanProfit = loan.installments.reduce((installmentAcc, installment) => {
@@ -101,17 +116,20 @@ export default function Dashboard() {
         return installmentAcc;
     }, 0);
     return acc + loanProfit;
-  }, 0);
+  }, 0), [allLoans]);
   
-  const totalReceitas = transactions
+  const totalReceitas = useMemo(() => (transactions || [])
     .filter(t => t.type === 'receita')
-    .reduce((acc, t) => acc + t.amount, 0);
+    .reduce((acc, t) => acc + t.amount, 0), [transactions]);
 
-  const totalDespesas = transactions
+  const totalDespesas = useMemo(() => (transactions || [])
     .filter(t => t.type === 'despesa')
-    .reduce((acc, t) => acc + t.amount, 0);
+    .reduce((acc, t) => acc + t.amount, 0), [transactions]);
     
   const balancoGeral = totalReceitas - totalDespesas;
+  
+  const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingTransactions || isLoadingBankAccounts;
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -136,11 +154,13 @@ export default function Dashboard() {
             </svg>
           </CardHeader>
           <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> :
             <div className="text-2xl font-bold font-headline">
               {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
+            }
             <p className="text-xs text-muted-foreground">
-              Total de {allLoans.length} empréstimos concedidos.
+              Total de {(allLoans || []).length} empréstimos concedidos.
             </p>
           </CardContent>
         </Card>
@@ -164,7 +184,9 @@ export default function Dashboard() {
             </svg>
           </CardHeader>
           <CardContent>
+             {isLoading ? <Skeleton className="h-8 w-1/4" /> :
             <div className="text-2xl font-bold font-headline">+{totalCustomers}</div>
+            }
             <p className="text-xs text-muted-foreground">
               Total de clientes cadastrados.
             </p>
@@ -189,9 +211,11 @@ export default function Dashboard() {
             </svg>
           </CardHeader>
           <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> :
             <div className="text-2xl font-bold font-headline">
               {profitability.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
+            }
             <p className="text-xs text-muted-foreground">
               Lucro total dos juros pagos.
             </p>
@@ -205,12 +229,14 @@ export default function Dashboard() {
               <ArrowUpCircle className="h-5 w-5 text-green-600" />
             </CardHeader>
             <CardContent>
+              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
               <div className="text-2xl font-bold font-headline text-green-800">
                 {totalReceitas.toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
                 })}
               </div>
+              }
               <p className="text-xs text-green-700">
                 Soma de todas as receitas
               </p>
@@ -224,12 +250,14 @@ export default function Dashboard() {
               <ArrowDownCircle className="h-5 w-5 text-red-600" />
             </CardHeader>
             <CardContent>
+              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
               <div className="text-2xl font-bold font-headline text-red-800">
                 {totalDespesas.toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
                 })}
               </div>
+              }
               <p className="text-xs text-red-700">Soma de todas as despesas</p>
             </CardContent>
           </Card>
@@ -241,12 +269,14 @@ export default function Dashboard() {
               <CircleDollarSign className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
+              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
               <div className="text-2xl font-bold font-headline text-blue-800">
                 {balancoGeral.toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
                 })}
               </div>
+              }
               <p className="text-xs text-blue-700">Receitas - Despesas</p>
             </CardContent>
           </Card>
@@ -271,9 +301,18 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentLoans.map(loan => {
+                {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                    </TableRow>
+                ))}
+                {!isLoading && recentLoans.map(loan => {
                   const date = parseISO(loan.startDate);
-                  const customer = customers.find(c => c.id === loan.customerId);
+                  const customer = (customers || []).find(c => c.id === loan.customerId);
                   return (
                   <TableRow key={loan.id}>
                     <TableCell>
@@ -315,6 +354,7 @@ export default function Dashboard() {
                 </div>
             </CardHeader>
             <CardContent className="pl-2">
+              {isLoading ? <Skeleton className="w-full h-[300px]" /> :
                 <ChartContainer config={chartConfig} className="w-full h-[300px]">
                     {chartType === 'bar' && 
                         <BarChart data={balanceChartData}>
@@ -350,6 +390,7 @@ export default function Dashboard() {
                         </AreaChart>
                     }
                 </ChartContainer>
+                }
             </CardContent>
         </Card>
       </div>
@@ -370,7 +411,14 @@ export default function Dashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bankAccounts.map((account) => (
+              {isLoading && Array.from({ length: 2 }).map((_, i) => (
+                    <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-4 w-24" /></TableCell>
+                    </TableRow>
+              ))}
+              {!isLoading && (bankAccounts || []).map((account) => (
                 <TableRow key={account.id}>
                   <TableCell className="font-medium">{account.banco}</TableCell>
                   <TableCell>{account.agencia} / {account.conta}</TableCell>

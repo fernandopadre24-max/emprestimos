@@ -73,6 +73,7 @@ const initialFilterState: FilterState = {
 function AccountTransactions({ accountId, categories }: { accountId: string, categories: Category[] }) {
   const firestore = useFirestore();
   const transactionsQuery = useMemo(() => {
+    if (!firestore || !accountId) return null;
     return query(collection(firestore, `bankAccounts/${accountId}/transactions`));
   }, [firestore, accountId]);
 
@@ -243,16 +244,28 @@ export default function BancoPage() {
   const firestore = useFirestore();
   const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
   const categoriesQuery = useMemo(() => collection(firestore, 'categories'), [firestore]);
+  const transactionsQuery = useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]);
 
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
+  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(transactionsQuery);
 
-  const [bankSummary, setBankSummary] = useState({
-    receitas: 0,
-    despesas: 0,
-    balanco: 0,
-    saldoContas: 0
-  });
+  const bankSummary = useMemo(() => {
+    const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
+    
+    const receitas = (allTransactions || [])
+      .filter(t => t.type === 'receita')
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const despesas = (allTransactions || [])
+      .filter(t => t.type === 'despesa')
+      .reduce((acc, t) => acc + t.amount, 0);
+    
+    const balanco = receitas - despesas;
+    
+    return { saldoContas, receitas, despesas, balanco };
+  }, [bankAccounts, allTransactions]);
+
 
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
   const [isEditAccountOpen, setEditAccountOpen] = useState(false);
@@ -263,32 +276,6 @@ export default function BancoPage() {
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
-
-
-  useEffect(() => {
-    const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
-    setBankSummary(prev => ({...prev, saldoContas}));
-
-    if (firestore) {
-      const transactionsQuery = query(collectionGroup(firestore, 'transactions'));
-      getDocs(transactionsQuery).then(snapshot => {
-        const allTransactions = snapshot.docs.map(doc => doc.data() as Transaction);
-        
-        const receitas = allTransactions
-          .filter(t => t.type === 'receita')
-          .reduce((acc, t) => acc + t.amount, 0);
-
-        const despesas = allTransactions
-          .filter(t => t.type === 'despesa')
-          .reduce((acc, t) => acc + t.amount, 0);
-        
-        const balanco = receitas - despesas;
-        
-        setBankSummary({ saldoContas, receitas, despesas, balanco });
-      });
-    }
-  }, [bankAccounts, firestore]);
-
 
   const handleTransaction = (account: BankAccount, type: "receita" | "despesa") => {
     setSelectedAccount(account);
@@ -340,7 +327,7 @@ export default function BancoPage() {
     );
   }
   
-  const isLoading = isLoadingAccounts || isLoadingCategories;
+  const isLoading = isLoadingAccounts || isLoadingCategories || isLoadingTransactions;
   
   return (
     <>
@@ -526,3 +513,5 @@ export default function BancoPage() {
     </>
   )
 }
+
+    

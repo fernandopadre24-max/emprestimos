@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
-
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,11 +25,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import type { Customer, Loan, BankAccount } from "@/lib/types";
-import { generateInstallments, customers as mockCustomers, bankAccounts as mockBankAccounts } from "@/lib/data";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { useCollection, useFirestore } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { addLoan } from "@/lib/loans";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 const formSchema = z.object({
@@ -51,15 +53,21 @@ interface Simulation {
 export default function LoanForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const firestore = useFirestore();
 
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const customersQuery = useMemo(() => collection(firestore, 'customers'), [firestore]);
+  const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
+  
+  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
+  const { data: bankAccounts, isLoading: isLoadingBankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+
+
   const [simulation, setSimulation] = useState<Simulation | null>(null);
-  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  
+  const availableBalance = useMemo(() => {
+    return (bankAccounts || []).reduce((acc, doc) => acc + doc.saldo, 0);
+  }, [bankAccounts]);
 
-  useEffect(() => {
-    const totalBalance = mockBankAccounts.reduce((acc, doc) => acc + doc.saldo, 0);
-    setAvailableBalance(totalBalance);
-  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -106,7 +114,7 @@ export default function LoanForm() {
         return;
     }
 
-    const customer = customers.find(c => c.id === values.customerId);
+    const customer = (customers || []).find(c => c.id === values.customerId);
     
     if (!customer) {
         toast({
@@ -116,9 +124,16 @@ export default function LoanForm() {
         });
         return;
     }
-    
-    // In a real app, you would save this to your state management or API
-    console.log("New Loan Submitted:", values);
+
+    const newLoanData: Omit<Loan, 'id' | 'installments' | 'loanCode'> = {
+        ...values,
+        interestRate: values.interestRate / 100, // Convert percentage to decimal
+        lateFeeRate: values.lateFeeRate / 100, // Convert percentage to decimal
+        startDate: values.startDate.toISOString(),
+        status: 'Em dia',
+    };
+
+    addLoan(firestore, newLoanData);
 
     toast({
       title: "Solicitação Enviada!",
@@ -131,10 +146,32 @@ export default function LoanForm() {
 
     router.push("/emprestimos");
   }
+  
+  const isLoading = isLoadingCustomers || isLoadingBankAccounts;
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-8">
+        {isLoading ? (
+            <div className="space-y-6">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-8 w-48 pt-4" />
+                <Skeleton className="h-10 w-full" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                    <Skeleton className="h-10 w-36" />
+                    <Skeleton className="h-10 w-40" />
+                </div>
+            </div>
+        ) : (
         <div className="space-y-6">
           <h3 className="text-lg font-medium font-headline">Informações do Cliente</h3>
             <FormField
@@ -150,7 +187,7 @@ export default function LoanForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {customers.map(customer => (
+                      {(customers || []).map(customer => (
                         <SelectItem key={customer.id} value={customer.id}>
                           {customer.name} ({customer.cpf})
                         </SelectItem>
@@ -271,6 +308,7 @@ export default function LoanForm() {
             <Button type="submit" className="w-full sm:w-auto">Solicitar Empréstimo</Button>
           </div>
         </div>
+        )}
 
         <Card className="bg-muted/30">
           <CardHeader>
@@ -315,3 +353,5 @@ export default function LoanForm() {
     </Form>
   );
 }
+
+    

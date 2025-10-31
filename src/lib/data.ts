@@ -1,25 +1,17 @@
 
-
-
-
-
 import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount, Transaction, Installment, Category } from '@/lib/types';
 import { addMonths, formatISO } from 'date-fns';
 
-export const customers: Customer[] = [
-  { id: '1', name: 'João Silva', email: 'joao.silva@example.com', cpf: '123.456.789-01', address: 'Rua das Flores', postalCode: '12345-678', houseNumber: '123', city: 'São Paulo', registrationDate: '2023-01-15', loanStatus: 'Ativo' },
-  { id: '2', name: 'Maria Oliveira', email: 'maria.o@example.com', cpf: '234.567.890-12', address: 'Avenida Brasil', postalCode: '23456-789', houseNumber: '456', city: 'Rio de Janeiro', registrationDate: '2023-02-20', loanStatus: 'Pago' },
-  { id: '3', name: 'Carlos Pereira', email: 'carlos.p@example.com', cpf: '345.678.901-23', address: 'Praça da Sé', postalCode: '34567-890', houseNumber: '789', city: 'Belo Horizonte', registrationDate: '2023-03-10', loanStatus: 'Ativo' },
-  { id: '4', name: 'Ana Costa', email: 'ana.costa@example.com', cpf: '456.789.012-34', address: 'Rua do Sol', postalCode: '45678-901', houseNumber: '101', city: 'Salvador', registrationDate: '2023-04-05', loanStatus: 'Inadimplente' },
-  { id: '5', name: 'Pedro Martins', email: 'pedro.m@example.com', cpf: '567.890.123-45', address: 'Avenida das Nações', postalCode: '56789-012', houseNumber: '212', city: 'Brasília', registrationDate: '2023-05-25', loanStatus: 'Ativo' },
-];
+// This file is now primarily for generating initial data structures or for utility functions.
+// The mock data arrays have been removed as the app now connects to Firestore.
 
-export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installment[] => {
+export const generateInstallments = (loan: Omit<Loan, 'installments' | 'id'> & {id?: string}): Installment[] => {
     const installments: Installment[] = [];
     const principal = loan.amount;
     const monthlyRate = loan.interestRate;
     const numberOfMonths = loan.term;
     const startDate = new Date(loan.startDate);
+    const loanId = loan.id || `L${Date.now()}`;
     
     const monthlyPayment = monthlyRate > 0 
       ? (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfMonths)) / (Math.pow(1 + monthlyRate, numberOfMonths) - 1)
@@ -28,8 +20,8 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
     for (let i = 1; i <= loan.term; i++) {
         const dueDate = addMonths(startDate, i);
         installments.push({
-            id: `${loan.id}-I${i}`,
-            loanId: loan.id,
+            id: `${loanId}-I${i}`,
+            loanId: loanId,
             installmentNumber: i,
             amount: monthlyPayment,
             originalAmount: monthlyPayment,
@@ -41,64 +33,4 @@ export const generateInstallments = (loan: Omit<Loan, 'installments'>): Installm
     return installments;
 }
 
-
-const initialLoans: Omit<Loan, 'installments'>[] = [
-  { id: 'L1', loanCode: 'CS-001', customerId: '1', amount: 10000, interestRate: 0.05, term: 24, lateFeeRate: 0.03, startDate: '2023-01-20', status: 'Em dia' },
-  { id: 'L2', loanCode: 'CS-002', customerId: '2', amount: 5000, interestRate: 0.08, term: 12, lateFeeRate: 0.03, startDate: '2023-02-25', status: 'Pago' },
-  { id: 'L3', loanCode: 'CS-003', customerId: '3', amount: 15000, interestRate: 0.06, term: 36, lateFeeRate: 0.03, startDate: '2023-03-15', status: 'Em dia' },
-  { id: 'L4', loanCode: 'CS-004', customerId: '4', amount: 7500, interestRate: 0.1, term: 18, lateFeeRate: 0.03, startDate: '2023-04-10', status: 'Atrasado' },
-  { id: 'L5', loanCode: 'CS-005', customerId: '5', amount: 20000, interestRate: 0.04, term: 48, lateFeeRate: 0.03, startDate: '2023-05-30', status: 'Em dia' },
-  { id: 'L6', loanCode: 'CS-006', customerId: '1', amount: 2000, interestRate: 0.09, term: 6, lateFeeRate: 0.03, startDate: '2024-06-10', status: 'Em dia' },
-];
-
-export const loans: Loan[] = initialLoans.map(loan => ({
-    ...loan,
-    installments: generateInstallments(loan)
-}));
-
-
-export const chartData: ChartData[] = [
-    { month: "Janeiro", emprestimos: 186 },
-    { month: "Fevereiro", emprestimos: 305 },
-    { month: "Março", emprestimos: 237 },
-    { month: "Abril", emprestimos: 173 },
-    { month: "Maio", emprestimos: 209 },
-    { month: "Junho", emprestimos: 250 },
-];
-
-export const bankData: BankData = {
-  totalBalance: 500000,
-  totalWithdrawn: 150000,
-  availableForLoans: 350000,
-};
-
-export const bankSummary: BankSummary = {
-  receitas: 3578.00,
-  despesas: 2283.65,
-  balanco: 1294.35,
-  saldoContas: 935.06,
-};
-
-export const bankAccounts: BankAccount[] = [
-  { id: '1', banco: 'NUBANK', agencia: '0001', conta: '4512558-0', saldo: 935.06 },
-];
-
-export const transactions: Transaction[] = [
-    { id: 'T1', accountId: '1', description: 'Salário', amount: 3500, date: '2024-07-05', type: 'receita', category: 'Salário' },
-    { id: 'T2', accountId: '1', description: 'Aluguel', amount: 1500, date: '2024-07-06', type: 'despesa', category: 'Moradia' },
-    { id: 'T3', accountId: '1', description: 'Supermercado', amount: 450.75, date: '2024-07-08', type: 'despesa', category: 'Alimentação' },
-    { id: 'T4', accountId: '1', description: 'Freela', amount: 800, date: '2024-07-10', type: 'receita', category: 'Renda Extra' },
-    { id: 'T5', accountId: '1', description: 'Conta de Luz', amount: 120.50, date: '2024-07-12', type: 'despesa', category: 'Contas' },
-];
-
-export const categories: Category[] = [
-    { id: 'C1', name: 'Salário', type: 'receita'},
-    { id: 'C2', name: 'Renda Extra', type: 'receita'},
-    { id: 'C3', name: 'Moradia', type: 'despesa'},
-    { id: 'C4', name: 'Alimentação', type: 'despesa'},
-    { id: 'C5', name: 'Transporte', type: 'despesa'},
-    { id: 'C6', name: 'Saúde', type: 'despesa'},
-    { id: 'C7', name: 'Lazer', type: 'despesa'},
-    { id: 'C8', name: 'Contas', type: 'despesa'},
-];
     
