@@ -26,10 +26,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import type { Customer, Loan, Installment } from "@/lib/types";
+import type { Customer, Loan, BankAccount } from "@/lib/types";
 import { generateInstallments } from "@/lib/data";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { customers as initialCustomers } from "@/lib/data";
+import { customers as initialCustomers, bankAccounts as initialBankAccounts } from "@/lib/data";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,7 @@ export default function LoanForm() {
   const router = useRouter();
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [availableBalance, setAvailableBalance] = useState<number>(0);
 
   useEffect(() => {
     const storedCustomers = localStorage.getItem("customers");
@@ -64,6 +65,12 @@ export default function LoanForm() {
       setCustomers(initialCustomers);
       localStorage.setItem("customers", JSON.stringify(initialCustomers));
     }
+
+    const storedAccounts = localStorage.getItem("bankAccounts");
+    const accounts: BankAccount[] = storedAccounts ? JSON.parse(storedAccounts) : initialBankAccounts;
+    const totalBalance = accounts.reduce((acc, account) => acc + account.saldo, 0);
+    setAvailableBalance(totalBalance);
+
   }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -102,6 +109,17 @@ export default function LoanForm() {
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+
+    if (values.amount > availableBalance) {
+        toast({
+            variant: "destructive",
+            title: "Saldo Insuficiente",
+            description: `O valor do empréstimo (R$ ${values.amount.toFixed(2)}) excede o saldo disponível em contas (R$ ${availableBalance.toFixed(2)}).`,
+        });
+        return;
+    }
+
+
     const storedLoans = localStorage.getItem("loans");
     let loans: Loan[] = storedLoans ? JSON.parse(storedLoans) : [];
 
