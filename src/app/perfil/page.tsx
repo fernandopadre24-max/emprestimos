@@ -7,39 +7,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { useUser } from "@/firebase";
 import { Upload } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PerfilPage() {
-    const userAvatarPlaceholder = PlaceHolderImages.find(p => p.id === "user-avatar");
+    const { user, loading } = useUser();
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
-    const [name, setName] = useState("Usuário CredSimples");
-    const [email, setEmail] = useState("usuario@credisimples.com");
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
 
 
     useEffect(() => {
-        const savedAvatar = localStorage.getItem("userAvatar");
-        if (savedAvatar) {
-            setAvatarPreview(savedAvatar);
+        if (user) {
+            setAvatarPreview(user.photoURL || null);
+            setName(user.displayName || "Usuário CredSimples");
+            setEmail(user.email || "");
         }
-
-        const savedName = localStorage.getItem("userName");
-        if (savedName) {
-            setName(savedName);
-        }
-
-        const savedEmail = localStorage.getItem("userEmail");
-        if (savedEmail) {
-            setEmail(savedEmail);
-        }
-    }, []);
+    }, [user]);
 
     const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -48,10 +40,10 @@ export default function PerfilPage() {
             reader.onloadend = () => {
                 const result = reader.result as string;
                 setAvatarPreview(result);
-                localStorage.setItem("userAvatar", result);
+                // TODO: Implement Firebase profile update logic
                 toast({
-                    title: "Sucesso!",
-                    description: "Sua foto de perfil foi atualizada.",
+                    title: "Pré-visualização!",
+                    description: "Sua foto de perfil foi atualizada na pré-visualização. A funcionalidade de salvar será implementada.",
                     className: "bg-accent text-accent-foreground"
                 });
             };
@@ -64,16 +56,15 @@ export default function PerfilPage() {
     };
 
     const handleSaveChanges = () => {
-        localStorage.setItem("userName", name);
-        localStorage.setItem("userEmail", email);
+        // TODO: Implement Firebase profile update logic
         toast({
-            title: "Sucesso!",
-            description: "Suas informações foram atualizadas.",
-            className: "bg-accent text-accent-foreground"
+            title: "Funcionalidade em desenvolvimento!",
+            description: "A atualização de informações de perfil será implementada em breve.",
         })
     }
 
     const handleUpdatePassword = () => {
+         // TODO: Implement Firebase password update logic
         if (newPassword !== confirmPassword) {
             toast({
                 variant: "destructive",
@@ -92,13 +83,62 @@ export default function PerfilPage() {
         }
         
         toast({
-            title: "Sucesso!",
-            description: "Sua senha foi atualizada.",
-            className: "bg-accent text-accent-foreground"
+            title: "Funcionalidade em desenvolvimento!",
+            description: "A atualização de senha será implementada em breve.",
         });
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
+    }
+
+    if (loading) {
+        return (
+             <div className="grid gap-6">
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-8 w-24" />
+                        <Skeleton className="h-4 w-72" />
+                    </CardHeader>
+                </Card>
+                 <div className="grid md:grid-cols-3 gap-6">
+                    <div className="md:col-span-1 space-y-6">
+                        <Card>
+                            <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+                            <CardContent className="flex flex-col items-center gap-4">
+                                <Skeleton className="h-32 w-32 rounded-full" />
+                                <Skeleton className="h-10 w-36" />
+                            </CardContent>
+                        </Card>
+                    </div>
+                     <div className="md:col-span-2 space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <Skeleton className="h-6 w-40" />
+                                <Skeleton className="h-4 w-52" />
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                            </CardContent>
+                            <CardFooter className="border-t pt-6">
+                                <Skeleton className="h-10 w-32" />
+                            </CardFooter>
+                        </Card>
+                     </div>
+                </div>
+            </div>
+        )
+    }
+    
+    if (!user) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Acesso Negado</CardTitle>
+                    <CardDescription>Você precisa estar logado para ver seu perfil.</CardDescription>
+                </CardHeader>
+            </Card>
+        )
     }
 
   return (
@@ -118,8 +158,8 @@ export default function PerfilPage() {
                     </CardHeader>
                     <CardContent className="flex flex-col items-center gap-4">
                         <Avatar className="h-32 w-32">
-                           <AvatarImage src={avatarPreview || userAvatarPlaceholder?.imageUrl} alt="Avatar do usuário" data-ai-hint={userAvatarPlaceholder?.imageHint} />
-                            <AvatarFallback>CS</AvatarFallback>
+                           <AvatarImage src={avatarPreview || ''} alt="Avatar do usuário" />
+                            <AvatarFallback>{name[0]}</AvatarFallback>
                         </Avatar>
                         <input
                             type="file"
@@ -148,7 +188,7 @@ export default function PerfilPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">E-mail</Label>
-                            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} readOnly disabled/>
                         </div>
                     </CardContent>
                     <CardFooter className="border-t pt-6">
