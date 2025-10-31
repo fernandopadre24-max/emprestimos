@@ -9,7 +9,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { useAuth, useFirestore } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, type Firestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -31,12 +31,19 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const auth = useAuth() as Auth;
-  const firestore = useFirestore();
+  const firestore = useFirestore() as Firestore;
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSignUp = async () => {
-    if (!firestore) return;
+    if (!firestore) {
+      toast({
+        variant: "destructive",
+        title: "Erro de Configuração",
+        description: "O serviço de banco de dados não está disponível. Tente novamente mais tarde.",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
