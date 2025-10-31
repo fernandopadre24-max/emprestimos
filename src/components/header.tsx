@@ -1,3 +1,6 @@
+
+"use client"
+
 import Link from "next/link"
 import {
   Breadcrumb,
@@ -10,9 +13,15 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import UserNav from "@/components/user-nav"
 import { Button } from "./ui/button"
-import { PlusCircle } from "lucide-react"
+import { PlusCircle, Calendar as CalendarIcon, Calculator } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
+import { Calendar } from "./ui/calendar"
+import { useState } from "react"
+import { CalculatorComponent } from "./calculator"
+import { ptBR } from "date-fns/locale"
 
 export default function Header() {
+  const [date, setDate] = useState<Date | undefined>(new Date())
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
       <SidebarTrigger className="sm:hidden" />
@@ -32,6 +41,35 @@ export default function Header() {
       <div className="relative ml-auto flex-1 md:grow-0">
         {/* Can add a search bar here if needed */}
       </div>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" className="h-8 w-8">
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0">
+          <Calendar
+            mode="single"
+            selected={date}
+            onSelect={setDate}
+            initialFocus
+            locale={ptBR}
+          />
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" className="h-8 w-8">
+            <Calculator className="h-4 w-4" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80">
+          <CalculatorComponent />
+        </PopoverContent>
+      </Popover>
+
       <Button asChild size="sm" className="h-8 gap-1">
         <Link href="/emprestimos/novo">
           <PlusCircle className="h-3.5 w-3.5" />
