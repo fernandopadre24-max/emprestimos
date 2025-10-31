@@ -36,6 +36,9 @@ import { Badge } from "@/components/ui/badge"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
 
 export default function BancoPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -55,6 +58,8 @@ export default function BancoPage() {
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
+  const [filters, setFilters] = useState<Record<string, { searchTerm: string; type: string }>>({});
+
 
   useEffect(() => {
     const storedBankAccounts = localStorage.getItem("bankAccounts");
@@ -188,9 +193,12 @@ export default function BancoPage() {
     const updatedAccounts = bankAccounts.map(account => {
       if (account.id === oldTransaction.accountId) {
         let newBalance = account.saldo;
+        // This logic is tricky. Let's assume type doesn't change.
         if (oldTransaction.type === 'receita') {
+            // if amount increased, increase balance. if amount decreased, decrease balance
             newBalance += amountDifference;
         } else { // despesa
+            // if amount increased, decrease balance. if amount decreased, increase balance
             newBalance -= amountDifference;
         }
         return { ...account, saldo: newBalance };
@@ -207,7 +215,23 @@ export default function BancoPage() {
     setExpandedRows(current =>
       current.includes(id) ? current.filter(rowId => rowId !== id) : [...current, id]
     );
+    // Initialize filter state for the account if it doesn't exist
+    if (!filters[id]) {
+      handleFilterChange(id, 'searchTerm', '');
+      handleFilterChange(id, 'type', 'todos');
+    }
   }
+
+  const handleFilterChange = (accountId: string, key: 'searchTerm' | 'type', value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [accountId]: {
+        ...prev[accountId],
+        [key]: value,
+      },
+    }));
+  };
+
 
   return (
     <>
@@ -317,9 +341,18 @@ export default function BancoPage() {
             <TableBody>
               {bankAccounts.map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
+                const accountFilter = filters[account.id] || { searchTerm: '', type: 'todos' };
+                
                 const accountTransactions = transactions
                   .filter(t => t.accountId === account.id)
+                  .filter(t => 
+                    t.description.toLowerCase().includes(accountFilter.searchTerm.toLowerCase())
+                  )
+                  .filter(t => 
+                    accountFilter.type === 'todos' ? true : t.type === accountFilter.type
+                  )
                   .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+
                 return (
                 <React.Fragment key={account.id}>
                   <TableRow>
@@ -361,7 +394,30 @@ export default function BancoPage() {
                      <TableRow>
                         <TableCell colSpan={6}>
                           <div className="p-4 bg-muted/50 rounded-md">
-                            <h4 className="font-bold mb-2">Transações Recentes</h4>
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="font-bold">Transações Recentes</h4>
+                                <div className="flex gap-2">
+                                <Input 
+                                    placeholder="Buscar por descrição..." 
+                                    className="max-w-xs"
+                                    value={accountFilter.searchTerm}
+                                    onChange={(e) => handleFilterChange(account.id, 'searchTerm', e.target.value)}
+                                />
+                                <Select
+                                    value={accountFilter.type}
+                                    onValueChange={(value) => handleFilterChange(account.id, 'type', value)}
+                                >
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Filtrar por tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="todos">Todos</SelectItem>
+                                        <SelectItem value="receita">Receitas</SelectItem>
+                                        <SelectItem value="despesa">Despesas</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                </div>
+                            </div>
                             {accountTransactions.length > 0 ? (
                                 <Table>
                                     <TableHeader>
@@ -396,7 +452,7 @@ export default function BancoPage() {
                                     </TableBody>
                                 </Table>
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação para esta conta.</p>
+                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação encontrada para esta conta com os filtros aplicados.</p>
                             )}
                           </div>
                         </TableCell>
@@ -439,7 +495,3 @@ export default function BancoPage() {
     </>
   )
 }
-
-    
-
-    
