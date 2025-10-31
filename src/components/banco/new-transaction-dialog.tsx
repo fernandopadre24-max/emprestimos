@@ -1,7 +1,7 @@
 
 "use client"
 
-import type { BankAccount, Transaction } from "@/lib/types"
+import type { BankAccount, Transaction, Category } from "@/lib/types"
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface NewTransactionDialogProps {
   isOpen: boolean
@@ -22,20 +23,26 @@ interface NewTransactionDialogProps {
   onSubmit: (data: Omit<Transaction, 'id' | 'accountId' | 'type' | 'date'>) => void
   transactionType: "receita" | "despesa"
   account: BankAccount | null
+  categories: Category[]
 }
 
-export function NewTransactionDialog({ isOpen, onOpenChange, onSubmit, transactionType, account }: NewTransactionDialogProps) {
+export function NewTransactionDialog({ isOpen, onOpenChange, onSubmit, transactionType, account, categories }: NewTransactionDialogProps) {
   const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState<number | '' >('');
+  const [category, setCategory] = useState<string | undefined>(undefined);
 
   const isRevenue = transactionType === "receita";
   const title = isRevenue ? "Nova Receita" : "Nova Despesa";
   const dialogDescription = `Adicione uma nova ${isRevenue ? "receita" : "despesa"} para a conta ${account?.banco}.`
+  
+  const availableCategories = categories.filter(c => c.type === transactionType);
 
   const handleSubmit = () => {
-    onSubmit({ description, amount });
+    if (typeof amount !== 'number') return;
+    onSubmit({ description, amount, category });
     setDescription("");
-    setAmount(0);
+    setAmount('');
+    setCategory(undefined);
   }
 
   return (
@@ -58,7 +65,22 @@ export function NewTransactionDialog({ isOpen, onOpenChange, onSubmit, transacti
             <Label htmlFor="amount" className="text-right">
               Valor
             </Label>
-            <Input id="amount" type="number" placeholder="R$ 0,00" className="col-span-3" value={amount} onChange={(e) => setAmount(parseFloat(e.target.value))} />
+            <Input id="amount" type="number" placeholder="R$ 0,00" className="col-span-3" value={amount} onChange={(e) => setAmount(e.target.value === '' ? '' : parseFloat(e.target.value))} />
+          </div>
+           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="category" className="text-right">
+              Categoria
+            </Label>
+            <Select onValueChange={setCategory} value={category}>
+                <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                    {availableCategories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter>
@@ -69,5 +91,3 @@ export function NewTransactionDialog({ isOpen, onOpenChange, onSubmit, transacti
     </Dialog>
   )
 }
-
-    

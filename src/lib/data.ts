@@ -2,7 +2,8 @@
 
 
 
-import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount, Transaction, Installment } from '@/lib/types';
+
+import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount, Transaction, Installment, Category } from '@/lib/types';
 import { addMonths, formatISO } from 'date-fns';
 
 export const customers: Customer[] = [
@@ -83,11 +84,21 @@ export const bankAccounts: BankAccount[] = [
 ];
 
 export const transactions: Transaction[] = [
-    { id: 'T1', accountId: '1', description: 'Salário', amount: 3500, date: '2024-07-05', type: 'receita' },
-    { id: 'T2', accountId: '1', description: 'Aluguel', amount: 1500, date: '2024-07-06', type: 'despesa' },
-    { id: 'T3', accountId: '1', description: 'Supermercado', amount: 450.75, date: '2024-07-08', type: 'despesa' },
-    { id: 'T4', accountId: '1', description: 'Freela', amount: 800, date: '2024-07-10', type: 'receita' },
-    { id: 'T5', accountId: '1', description: 'Conta de Luz', amount: 120.50, date: '2024-07-12', type: 'despesa' },
+    { id: 'T1', accountId: '1', description: 'Salário', amount: 3500, date: '2024-07-05', type: 'receita', category: 'Salário' },
+    { id: 'T2', accountId: '1', description: 'Aluguel', amount: 1500, date: '2024-07-06', type: 'despesa', category: 'Moradia' },
+    { id: 'T3', accountId: '1', description: 'Supermercado', amount: 450.75, date: '2024-07-08', type: 'despesa', category: 'Alimentação' },
+    { id: 'T4', accountId: '1', description: 'Freela', amount: 800, date: '2024-07-10', type: 'receita', category: 'Renda Extra' },
+    { id: 'T5', accountId: '1', description: 'Conta de Luz', amount: 120.50, date: '2024-07-12', type: 'despesa', category: 'Contas' },
 ];
 
+export const categories: Category[] = [
+    { id: 'C1', name: 'Salário', type: 'receita'},
+    { id: 'C2', name: 'Renda Extra', type: 'receita'},
+    { id: 'C3', name: 'Moradia', type: 'despesa'},
+    { id: 'C4', name: 'Alimentação', type: 'despesa'},
+    { id: 'C5', name: 'Transporte', type: 'despesa'},
+    { id: 'C6', name: 'Saúde', type: 'despesa'},
+    { id: 'C7', name: 'Lazer', type: 'despesa'},
+    { id: 'C8', name: 'Contas', type: 'despesa'},
+];
     

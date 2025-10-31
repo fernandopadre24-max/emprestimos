@@ -26,13 +26,14 @@ import {
   X,
 } from "lucide-react"
 
-import { bankAccounts as initialBankAccounts, transactions as initialTransactions } from "@/lib/data"
-import type { BankAccount, Transaction, NewBankAccount } from "@/lib/types"
+import { bankAccounts as initialBankAccounts, transactions as initialTransactions, categories as initialCategories } from "@/lib/data"
+import type { BankAccount, Transaction, NewBankAccount, Category } from "@/lib/types"
 
 import { AddAccountDialog } from "@/components/banco/add-account-dialog"
 import { EditAccountDialog } from "@/components/banco/edit-account-dialog"
 import { NewTransactionDialog } from "@/components/banco/new-transaction-dialog"
 import { EditTransactionDialog } from "@/components/banco/edit-transaction-dialog"
+import { ManageCategoriesDialog } from "@/components/banco/manage-categories-dialog"
 import { Badge } from "@/components/ui/badge"
 import { format, parseISO, isWithinInterval } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -59,6 +60,7 @@ const initialFilterState: FilterState = {
 export default function BancoPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [bankSummary, setBankSummary] = useState({
     receitas: 0,
     despesas: 0,
@@ -70,6 +72,8 @@ export default function BancoPage() {
   const [isEditAccountOpen, setEditAccountOpen] = useState(false);
   const [isTransactionOpen, setTransactionOpen] = useState(false);
   const [isEditTransactionOpen, setEditTransactionOpen] = useState(false);
+  const [isManageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -80,15 +84,19 @@ export default function BancoPage() {
   useEffect(() => {
     const storedBankAccounts = localStorage.getItem("bankAccounts");
     const storedTransactions = localStorage.getItem("transactions");
+    const storedCategories = localStorage.getItem("categories");
 
     const accountsData = storedBankAccounts ? JSON.parse(storedBankAccounts) : initialBankAccounts;
     const transactionsData = storedTransactions ? JSON.parse(storedTransactions) : initialTransactions;
+    const categoriesData = storedCategories ? JSON.parse(storedCategories) : initialCategories;
 
     setBankAccounts(accountsData);
     setTransactions(transactionsData);
+    setCategories(categoriesData);
 
     if (!storedBankAccounts) localStorage.setItem("bankAccounts", JSON.stringify(accountsData));
     if (!storedTransactions) localStorage.setItem("transactions", JSON.stringify(transactionsData));
+    if (!storedCategories) localStorage.setItem("categories", JSON.stringify(categoriesData));
   }, []);
 
   useEffect(() => {
@@ -117,6 +125,11 @@ export default function BancoPage() {
   const updateAndStoreTransactions = (newTransactions: Transaction[]) => {
     setTransactions(newTransactions);
     localStorage.setItem("transactions", JSON.stringify(newTransactions));
+  }
+
+  const updateAndStoreCategories = (newCategories: Category[]) => {
+    setCategories(newCategories);
+    localStorage.setItem("categories", JSON.stringify(newCategories));
   }
 
 
@@ -227,6 +240,19 @@ export default function BancoPage() {
     setSelectedTransaction(null);
   };
 
+  const handleAddCategory = (category: Omit<Category, 'id'>) => {
+    const newCategory: Category = {
+        id: `C${(Math.random() + 1).toString(36).substring(7)}`,
+        ...category
+    };
+    updateAndStoreCategories([...categories, newCategory]);
+  }
+
+  const handleDeleteCategory = (categoryId: string) => {
+    const updatedCategories = categories.filter(c => c.id !== categoryId);
+    updateAndStoreCategories(updatedCategories);
+  }
+
   const toggleRow = (id: string) => {
     setExpandedRows(current =>
       current.includes(id) ? current.filter(rowId => rowId !== id) : [...current, id]
@@ -267,7 +293,7 @@ export default function BancoPage() {
             <p className="text-muted-foreground">Controle Financeiro</p>
           </div>
           <div className="flex gap-2">
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => setManageCategoriesOpen(true)}>
                   <Settings className="mr-2 h-4 w-4" />
                   Gerenciar Categorias
               </Button>
@@ -467,6 +493,7 @@ export default function BancoPage() {
                                         <TableRow>
                                             <TableHead>Data</TableHead>
                                             <TableHead>Descrição</TableHead>
+                                            <TableHead>Categoria</TableHead>
                                             <TableHead>Tipo</TableHead>
                                             <TableHead className="text-right">Valor</TableHead>
                                             <TableHead className="text-right">Ações</TableHead>
@@ -477,6 +504,9 @@ export default function BancoPage() {
                                             <TableRow key={tx.id}>
                                                 <TableCell>{format(parseISO(tx.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                                                 <TableCell>{tx.description}</TableCell>
+                                                <TableCell>
+                                                    {tx.category && <Badge variant="outline">{tx.category}</Badge>}
+                                                </TableCell>
                                                 <TableCell>
                                                     <Badge variant={tx.type === 'receita' ? 'secondary' : 'destructive'} className={tx.type === 'receita' ? "bg-green-200 text-green-800" : ""}>{tx.type}</Badge>
                                                 </TableCell>
@@ -527,6 +557,7 @@ export default function BancoPage() {
         onSubmit={handleNewTransaction}
         transactionType={transactionType}
         account={selectedAccount}
+        categories={categories}
       />
 
       <EditTransactionDialog
@@ -534,6 +565,15 @@ export default function BancoPage() {
         onOpenChange={setEditTransactionOpen}
         onSubmit={handleEditTransaction}
         transaction={selectedTransaction}
+        categories={categories}
+      />
+      
+      <ManageCategoriesDialog
+        isOpen={isManageCategoriesOpen}
+        onOpenChange={setManageCategoriesOpen}
+        categories={categories}
+        onAddCategory={handleAddCategory}
+        onDeleteCategory={handleDeleteCategory}
       />
     </>
   )

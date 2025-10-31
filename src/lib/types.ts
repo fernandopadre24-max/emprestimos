@@ -74,7 +74,13 @@ export interface Transaction {
     amount: number;
     date: string;
     type: 'receita' | 'despesa';
+    category?: string;
     sourceId?: string; // To link back to the source of the transaction, e.g., a specific loan installment
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  type: 'receita' | 'despesa';
+}
     
