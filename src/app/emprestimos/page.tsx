@@ -181,11 +181,11 @@ export default function EmprestimosPage() {
     const loan = loans.find(l => l.id === loanId);
     const customer = customers.find(c => c.id === loan?.customerId);
     if (!loan || !customer) return;
-
+  
+    // Create Transaction
     const installment = loan.installments.find(i => i.id === installmentId);
     if (!installment) return;
 
-    // Create Transaction
     const newTransaction: Transaction = {
         id: `T${(Math.random() + 1).toString(36).substring(7)}`,
         accountId: accountId,
@@ -202,7 +202,7 @@ export default function EmprestimosPage() {
         acc.id === accountId ? {...acc, saldo: acc.saldo + amountPaid} : acc
     );
     updateAndStoreBankAccounts(newBankAccounts);
-
+  
     // Update Loan Installment
     const newLoans = loans.map(l => {
       if (l.id === loanId) {
@@ -210,7 +210,7 @@ export default function EmprestimosPage() {
           if (i.id === installmentId) {
              const newPaidAmount = (i.paidAmount || 0) + amountPaid;
              const isFullyPaid = newPaidAmount >= i.originalAmount;
-
+  
             return {
               ...i,
               paidAmount: newPaidAmount,
@@ -219,7 +219,7 @@ export default function EmprestimosPage() {
           }
           return i;
         });
-
+  
         const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
         return {
           ...l,
@@ -230,7 +230,7 @@ export default function EmprestimosPage() {
       return l;
     });
     updateAndStoreLoans(newLoans);
-
+  
     // Update customer status
     const customerLoans = newLoans.filter(l => l.customerId === customer.id);
     if (customerLoans.every(l => l.status === 'Pago')) {
@@ -238,10 +238,9 @@ export default function EmprestimosPage() {
     } else {
         updateAndStoreCustomers(customers.map(c => c.id === customer.id ? {...c, loanStatus: 'Ativo'} : c));
     }
-
+  
     setCreditDialogOpen(false);
-};
-
+  };
   
   const handleRevertPayment = (loanId: string, installmentId: string) => {
     // Find all transactions for this installment
