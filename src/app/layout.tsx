@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import MainSidebar from '@/components/main-sidebar';
 import Header from '@/components/header';
+import { ThemeProvider } from '@/components/theme-provider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
@@ -29,16 +30,23 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased', inter.variable, spaceGrotesk.variable)}>
-        <Toaster />
-        <SidebarProvider>
-            <MainSidebar />
-            <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
-              <Header />
-              <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
-                {children}
-              </main>
-            </div>
-        </SidebarProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Toaster />
+          <SidebarProvider>
+              <MainSidebar />
+              <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+                <Header />
+                <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+                  {children}
+                </main>
+              </div>
+          </SidebarProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

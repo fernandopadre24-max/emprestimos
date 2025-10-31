@@ -19,6 +19,7 @@ import { Calendar } from "./ui/calendar"
 import { useState } from "react"
 import { CalculatorComponent } from "./calculator"
 import { ptBR } from "date-fns/locale"
+import { ThemeToggle } from "./theme-toggle"
 
 export default function Header() {
   const [date, setDate] = useState<Date | undefined>(new Date())
@@ -41,6 +42,8 @@ export default function Header() {
       <div className="relative ml-auto flex-1 md:grow-0">
         {/* Can add a search bar here if needed */}
       </div>
+
+      <ThemeToggle />
 
       <Popover>
         <PopoverTrigger asChild>
