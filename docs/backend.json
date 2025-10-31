@@ -60,6 +60,90 @@
         "registrationDate",
         "loanStatus"
       ]
+    },
+    "BankAccount": {
+      "title": "BankAccount",
+      "description": "Represents a bank account.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the bank account."
+        },
+        "banco": {
+          "type": "string",
+          "description": "The name of the bank."
+        },
+        "agencia": {
+          "type": "string",
+          "description": "The bank agency number."
+        },
+        "conta": {
+          "type": "string",
+          "description": "The bank account number."
+        },
+        "saldo": {
+          "type": "number",
+          "description": "The current balance of the account."
+        }
+      },
+      "required": [
+        "banco",
+        "agencia",
+        "conta",
+        "saldo"
+      ]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Represents a single financial transaction.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the transaction."
+        },
+        "accountId": {
+          "type": "string",
+          "description": "The ID of the bank account this transaction belongs to."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the transaction."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The transaction amount."
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time of the transaction."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "receita",
+            "despesa"
+          ],
+          "description": "The type of transaction (income or expense)."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the transaction."
+        },
+        "sourceId": {
+          "type": "string",
+          "description": "Optional ID to link the transaction to its source (e.g., a loan installment)."
+        }
+      },
+      "required": [
+        "accountId",
+        "description",
+        "amount",
+        "date",
+        "type"
+      ]
     }
   },
   "auth": {
@@ -71,6 +155,18 @@
         "$ref": "#/entities/Customer"
       },
       "description": "Stores customer profile information."
+    },
+    "/bankAccounts/{accountId}": {
+      "schema": {
+        "$ref": "#/entities/BankAccount"
+      },
+      "description": "Stores bank account information."
+    },
+    "/bankAccounts/{accountId}/transactions/{transactionId}": {
+      "schema": {
+        "$ref": "#/entities/Transaction"
+      },
+      "description": "Stores all transactions for a specific bank account."
     }
   }
 }

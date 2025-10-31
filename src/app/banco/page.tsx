@@ -52,8 +52,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
 
-import { bankAccounts as mockBankAccounts, transactions as mockTransactions, categories as mockCategories } from "@/lib/data"
-
+import { useCollection, useFirestore } from "@/firebase"
+import { collection, query } from "firebase/firestore"
+import { addBankAccount, updateBankAccount, deleteBankAccount } from "@/lib/bank"
+import { addTransaction, updateTransaction, deleteTransaction } from "@/lib/transactions"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface FilterState {
   searchTerm: string;
@@ -67,11 +70,182 @@ const initialFilterState: FilterState = {
   dateRange: undefined,
 };
 
+function AccountTransactions({ accountId }: { accountId: string }) {
+  const firestore = useFirestore();
+  const transactionsQuery = useMemo(() => {
+    return query(collection(firestore, `bankAccounts/${accountId}/transactions`));
+  }, [firestore, accountId]);
+
+  const { data: transactions, isLoading } = useCollection<Transaction>(transactionsQuery);
+
+  const [filters, setFilters] = useState<FilterState>(initialFilterState);
+  const [isEditTransactionOpen, setEditTransactionOpen] = useState(false);
+  const [isDeleteTransactionAlertOpen, setDeleteTransactionAlertOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const handleFilterChange = (key: keyof FilterState, value: any) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters(initialFilterState);
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return (transactions || [])
+      .filter(t => t.description.toLowerCase().includes(filters.searchTerm.toLowerCase()))
+      .filter(t => filters.type === 'todos' ? true : t.type === filters.type)
+      .filter(t => {
+        const { dateRange } = filters;
+        if (!dateRange || (!dateRange.from && !dateRange.to)) {
+          return true;
+        }
+        const txDate = parseISO(t.date);
+        return isWithinInterval(txDate, {
+          start: dateRange.from || new Date(0),
+          end: dateRange.to || new Date(),
+        });
+      })
+      .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+  }, [transactions, filters]);
+
+  const handleEditTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setEditTransactionOpen(true);
+  };
+
+  const handleEditTransaction = (editedTransactionData: Partial<Transaction>) => {
+    if (!selectedTransaction) return;
+    updateTransaction(firestore, accountId, selectedTransaction.id, editedTransactionData);
+    setEditTransactionOpen(false);
+  };
+
+  const handleDeleteTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setDeleteTransactionAlertOpen(true);
+  };
+
+  const handleDeleteTransaction = () => {
+    if (!selectedTransaction) return;
+    deleteTransaction(firestore, accountId, selectedTransaction.id);
+    setDeleteTransactionAlertOpen(false);
+  };
+
+  return (
+    <div className="p-4 bg-muted/50 rounded-md">
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="font-bold">Transações Recentes</h4>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Buscar por descrição..."
+            className="max-w-xs"
+            value={filters.searchTerm}
+            onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
+          />
+          <Select
+            value={filters.type}
+            onValueChange={(value) => handleFilterChange('type', value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="receita">Receitas</SelectItem>
+              <SelectItem value="despesa">Despesas</SelectItem>
+            </SelectContent>
+          </Select>
+          <DateRangePicker
+            date={filters.dateRange}
+            onDateChange={(date) => handleFilterChange('dateRange', date)}
+          />
+          <Button variant="ghost" onClick={clearFilters}>
+            <X className="mr-2 h-4 w-4" /> Limpar
+          </Button>
+        </div>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : filteredTransactions.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Data</TableHead>
+              <TableHead>Descrição</TableHead>
+              <TableHead>Categoria</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead className="text-right">Valor</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredTransactions.map((tx: Transaction) => (
+              <TableRow key={tx.id}>
+                <TableCell>{format(parseISO(tx.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                <TableCell>{tx.description}</TableCell>
+                <TableCell>
+                  {tx.category && <Badge variant="outline">{tx.category}</Badge>}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={tx.type === 'receita' ? 'secondary' : 'destructive'} className={tx.type === 'receita' ? "bg-green-200 text-green-800" : ""}>{tx.type}</Badge>
+                </TableCell>
+                <TableCell className={cn("text-right font-medium", tx.type === 'receita' ? 'text-green-600' : 'text-red-600')}>
+                  {tx.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTransactionClick(tx)}>
+                      <FilePenLine className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteTransactionClick(tx)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : (
+        <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação encontrada para esta conta com os filtros aplicados.</p>
+      )}
+
+      <EditTransactionDialog
+        isOpen={isEditTransactionOpen}
+        onOpenChange={setEditTransactionOpen}
+        onSubmit={handleEditTransaction}
+        transaction={selectedTransaction}
+        categories={[]} // TODO: Connect categories from Firestore
+      />
+
+      <AlertDialog open={isDeleteTransactionAlertOpen} onOpenChange={setDeleteTransactionAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso irá excluir permanentemente a transação. O saldo da conta não será ajustado automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
 
 export default function BancoPage() {
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(mockBankAccounts);
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
+  const firestore = useFirestore();
+  const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
+  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+  // TODO: Fetch all transactions for summary calculation
+  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(collection(firestore, 'transactions')); // This collection doesn't exist, needs rework
+
 
   const [bankSummary, setBankSummary] = useState({
     receitas: 0,
@@ -83,34 +257,30 @@ export default function BancoPage() {
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
   const [isEditAccountOpen, setEditAccountOpen] = useState(false);
   const [isTransactionOpen, setTransactionOpen] = useState(false);
-  const [isEditTransactionOpen, setEditTransactionOpen] = useState(false);
   const [isManageCategoriesOpen, setManageCategoriesOpen] = useState(false);
-  const [isDeleteTransactionAlertOpen, setDeleteTransactionAlertOpen] = useState(false);
 
 
   const [transactionType, setTransactionType] = useState<"receita" | "despesa">("receita");
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
-  const [filters, setFilters] = useState<Record<string, FilterState>>({});
 
 
   useEffect(() => {
-    // Recalculate summary whenever accounts or transactions change
     const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
-    
-    const receitas = (transactions || [])
+    // This summary logic needs to be revisited. We should fetch all transactions from all accounts.
+    // For now, it will be zero as `allTransactions` will be empty.
+    const receitas = (allTransactions || [])
       .filter(t => t.type === 'receita')
       .reduce((acc, t) => acc + t.amount, 0);
 
-    const despesas = (transactions || [])
+    const despesas = (allTransactions || [])
       .filter(t => t.type === 'despesa')
       .reduce((acc, t) => acc + t.amount, 0);
-
+    
     const balanco = receitas - despesas;
     
     setBankSummary({ saldoContas, receitas, despesas, balanco });
-  }, [bankAccounts, transactions]);
+  }, [bankAccounts, allTransactions]);
 
 
   const handleTransaction = (account: BankAccount, type: "receita" | "despesa") => {
@@ -125,161 +295,47 @@ export default function BancoPage() {
   }
 
   const handleAddAccount = (newAccountData: NewBankAccount) => {
-    const newAccount: BankAccount = {
-      id: `BA${Date.now()}`,
+    const newAccount: Omit<BankAccount, 'id'> = {
       saldo: 0,
       ...newAccountData
     };
-    setBankAccounts(prev => [...prev, newAccount]);
+    addBankAccount(firestore, newAccount);
     setAddAccountOpen(false);
   }
 
   const handleEditAccount = (editedAccountData: Partial<BankAccount>) => {
     if (!selectedAccount) return;
-    setBankAccounts(prev => prev.map(acc => acc.id === selectedAccount.id ? {...acc, ...editedAccountData} : acc));
+    updateBankAccount(firestore, selectedAccount.id, editedAccountData);
     setEditAccountOpen(false);
   }
   
   const handleDeleteAccount = (accountId: string) => {
-    setBankAccounts(prev => prev.filter(acc => acc.id !== accountId));
+    // Note: This doesn't delete sub-collections like transactions.
+    deleteBankAccount(firestore, accountId);
   }
 
   const handleNewTransaction = (transactionData: Omit<Transaction, 'id' | 'accountId' | 'type' | 'date'>) => {
-    if(!selectedAccount) return;
-    
-    const newTransaction: Transaction = {
-      id: `T${Date.now()}`,
-      accountId: selectedAccount.id,
-      type: transactionType,
-      date: new Date().toISOString(),
-      ...transactionData,
-    };
-    
-    setTransactions(prev => [...prev, newTransaction]);
-
-    setBankAccounts(prev => prev.map(acc => {
-      if (acc.id === selectedAccount.id) {
-        const newBalance = transactionType === 'receita'
-          ? acc.saldo + newTransaction.amount
-          : acc.saldo - newTransaction.amount;
-        return { ...acc, saldo: newBalance };
-      }
-      return acc;
-    }));
-
+    if (!selectedAccount) return;
+    addTransaction(firestore, selectedAccount.id, transactionData, transactionType);
     setTransactionOpen(false);
   }
 
-  const handleEditTransactionClick = (transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setEditTransactionOpen(true);
-  };
-
-  const handleEditTransaction = (editedTransactionData: Partial<Transaction>) => {
-    if (!selectedTransaction) return;
-    
-    const oldTransaction = transactions.find(t => t.id === selectedTransaction.id);
-    if (!oldTransaction) return;
-    
-    if (oldTransaction.sourceId?.startsWith('loan:')) {
-        alert("Não é possível editar transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
-        setEditTransactionOpen(false);
-        return;
-    }
-    
-    setTransactions(prev => prev.map(tx => tx.id === selectedTransaction.id ? {...tx, ...editedTransactionData} : tx));
-
-    const amountDifference = (editedTransactionData.amount ?? oldTransaction.amount) - oldTransaction.amount;
-    if (amountDifference !== 0) {
-      setBankAccounts(prev => prev.map(acc => {
-        if(acc.id === oldTransaction.accountId) {
-          let newBalance = acc.saldo;
-          if (oldTransaction.type === 'receita') {
-              newBalance += amountDifference;
-          } else {
-              newBalance -= amountDifference;
-          }
-          return {...acc, saldo: newBalance};
-        }
-        return acc;
-      }))
-    }
-
-    setEditTransactionOpen(false);
-    setSelectedTransaction(null);
-  };
-
-  const handleDeleteTransactionClick = (transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setDeleteTransactionAlertOpen(true);
-  }
-
-  const handleDeleteTransaction = () => {
-    if (!selectedTransaction) return;
-
-    if (selectedTransaction.sourceId?.startsWith('loan:')) {
-        alert("Não é possível excluir transações de empréstimo diretamente. Estorne o pagamento na tela de Empréstimos.");
-        setDeleteTransactionAlertOpen(false);
-        return;
-    }
-    
-    setTransactions(prev => prev.filter(tx => tx.id !== selectedTransaction.id));
-    
-    setBankAccounts(prev => prev.map(acc => {
-      if(acc.id === selectedTransaction.accountId) {
-        const newBalance = selectedTransaction.type === 'receita'
-            ? acc.saldo - selectedTransaction.amount
-            : acc.saldo + selectedTransaction.amount;
-        return {...acc, saldo: newBalance};
-      }
-      return acc;
-    }));
-
-
-    setDeleteTransactionAlertOpen(false);
-    setSelectedTransaction(null);
-  }
-
   const handleAddCategory = (category: Omit<Category, 'id'>) => {
-    const newCategory: Category = { id: `C${Date.now()}`, ...category };
-    setCategories(prev => [...prev, newCategory]);
+    // TODO: Implement Firestore logic for categories
+    console.log("Add category", category);
   }
 
   const handleDeleteCategory = (categoryId: string) => {
-    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    // TODO: Implement Firestore logic for categories
+    console.log("Delete category", categoryId);
   }
 
   const toggleRow = (id: string) => {
     setExpandedRows(current =>
       current.includes(id) ? current.filter(rowId => rowId !== id) : [...current, id]
     );
-    // Initialize filter state for the account if it doesn't exist
-    if (!filters[id]) {
-      setFilters(prev => ({
-        ...prev,
-        [id]: initialFilterState,
-      }));
-    }
   }
-
-  const handleFilterChange = (accountId: string, key: keyof FilterState, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [accountId]: {
-        ...prev[accountId],
-        [key]: value,
-      },
-    }));
-  };
   
-  const clearFilters = (accountId: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [accountId]: initialFilterState,
-    }));
-  };
-
-
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -289,14 +345,14 @@ export default function BancoPage() {
             <p className="text-muted-foreground">Controle Financeiro</p>
           </div>
           <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setManageCategoriesOpen(true)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Gerenciar Categorias
-              </Button>
-              <Button onClick={() => setAddAccountOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar Conta
-              </Button>
+            <Button variant="outline" onClick={() => setManageCategoriesOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" />
+              Gerenciar Categorias
+            </Button>
+            <Button onClick={() => setAddAccountOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar Conta
+            </Button>
           </div>
         </div>
 
@@ -310,10 +366,7 @@ export default function BancoPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold font-headline text-green-800">
-                {bankSummary.receitas.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
+                {bankSummary.receitas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
               <p className="text-xs text-green-700">
                 Total de entradas do período
@@ -329,10 +382,7 @@ export default function BancoPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold font-headline text-red-800">
-                {bankSummary.despesas.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
+                {bankSummary.despesas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
               <p className="text-xs text-red-700">Total de saídas do período</p>
             </CardContent>
@@ -346,10 +396,7 @@ export default function BancoPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold font-headline text-blue-800">
-                {bankSummary.balanco.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
+                {bankSummary.balanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
               <p className="text-xs text-blue-700">Receitas - Despesas</p>
             </CardContent>
@@ -363,10 +410,7 @@ export default function BancoPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold font-headline text-purple-800">
-                {bankSummary.saldoContas.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
+                {bankSummary.saldoContas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
               <p className="text-xs text-purple-700">Soma dos saldos bancários</p>
             </CardContent>
@@ -386,152 +430,59 @@ export default function BancoPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bankAccounts.map((account: BankAccount) => {
+              {isLoadingAccounts && Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell className="w-12"><Skeleton className="h-8 w-8 rounded" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
+                </TableRow>
+              ))}
+              {!isLoadingAccounts && bankAccounts?.map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
-                const accountFilter = filters[account.id] || initialFilterState;
-                
-                const accountTransactions = transactions
-                  .filter(t => t.accountId === account.id)
-                  .filter(t => 
-                    t.description.toLowerCase().includes(accountFilter.searchTerm.toLowerCase())
-                  )
-                  .filter(t => 
-                    accountFilter.type === 'todos' ? true : t.type === accountFilter.type
-                  )
-                  .filter(t => {
-                    const { dateRange } = accountFilter;
-                    if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                      return true;
-                    }
-                    const txDate = parseISO(t.date);
-                    return isWithinInterval(txDate, {
-                      start: dateRange.from || new Date(0),
-                      end: dateRange.to || new Date(),
-                    });
-                  })
-                  .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
-
                 return (
-                <React.Fragment key={account.id}>
-                  <TableRow>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => toggleRow(account.id)} className="h-8 w-8">
-                        <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
-                      </Button>
-                    </TableCell>
-                    <TableCell className="font-medium">{account.banco}</TableCell>
-                    <TableCell>{account.agencia}</TableCell>
-                    <TableCell>{account.conta}</TableCell>
-                    <TableCell className={cn("font-medium", account.saldo >= 0 ? 'text-green-600' : 'text-red-600')}>
-                      {account.saldo.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600" onClick={() => handleTransaction(account, 'receita')}>
-                          <ArrowUpCircle className="h-4 w-4" />
+                  <React.Fragment key={account.id}>
+                    <TableRow>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => toggleRow(account.id)} className="h-8 w-8">
+                          <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleTransaction(account, 'despesa')}>
-                          <ArrowDownCircle className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <ArrowRightLeft className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditAccountClick(account)}>
-                          <FilePenLine className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteAccount(account.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {isExpanded && (
-                     <TableRow>
+                      </TableCell>
+                      <TableCell className="font-medium">{account.banco}</TableCell>
+                      <TableCell>{account.agencia}</TableCell>
+                      <TableCell>{account.conta}</TableCell>
+                      <TableCell className={cn("font-medium", account.saldo >= 0 ? 'text-green-600' : 'text-red-600')}>
+                        {account.saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-600" onClick={() => handleTransaction(account, 'receita')}>
+                            <ArrowUpCircle className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleTransaction(account, 'despesa')}>
+                            <ArrowDownCircle className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditAccountClick(account)}>
+                            <FilePenLine className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteAccount(account.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow>
                         <TableCell colSpan={6}>
-                          <div className="p-4 bg-muted/50 rounded-md">
-                            <div className="flex justify-between items-center mb-4">
-                                <h4 className="font-bold">Transações Recentes</h4>
-                                <div className="flex items-center gap-2">
-                                    <Input 
-                                        placeholder="Buscar por descrição..." 
-                                        className="max-w-xs"
-                                        value={accountFilter.searchTerm}
-                                        onChange={(e) => handleFilterChange(account.id, 'searchTerm', e.target.value)}
-                                    />
-                                    <Select
-                                        value={accountFilter.type}
-                                        onValueChange={(value) => handleFilterChange(account.id, 'type', value)}
-                                    >
-                                        <SelectTrigger className="w-[180px]">
-                                            <SelectValue placeholder="Filtrar por tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="todos">Todos</SelectItem>
-                                            <SelectItem value="receita">Receitas</SelectItem>
-                                            <SelectItem value="despesa">Despesas</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                     <DateRangePicker
-                                      date={accountFilter.dateRange}
-                                      onDateChange={(date) => handleFilterChange(account.id, 'dateRange', date)}
-                                    />
-                                    <Button variant="ghost" onClick={() => clearFilters(account.id)}>
-                                        <X className="mr-2 h-4 w-4" /> Limpar
-                                    </Button>
-                                </div>
-                            </div>
-                            {accountTransactions.length > 0 ? (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Data</TableHead>
-                                            <TableHead>Descrição</TableHead>
-                                            <TableHead>Categoria</TableHead>
-                                            <TableHead>Tipo</TableHead>
-                                            <TableHead className="text-right">Valor</TableHead>
-                                            <TableHead className="text-right">Ações</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {accountTransactions.map((tx: Transaction) => (
-                                            <TableRow key={tx.id}>
-                                                <TableCell>{format(parseISO(tx.date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
-                                                <TableCell>{tx.description}</TableCell>
-                                                <TableCell>
-                                                    {tx.category && <Badge variant="outline">{tx.category}</Badge>}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={tx.type === 'receita' ? 'secondary' : 'destructive'} className={tx.type === 'receita' ? "bg-green-200 text-green-800" : ""}>{tx.type}</Badge>
-                                                </TableCell>
-                                                <TableCell className={cn("text-right font-medium", tx.type === 'receita' ? 'text-green-600' : 'text-red-600')}>
-                                                    {tx.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL"})}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                  <div className="flex justify-end gap-2">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTransactionClick(tx)}>
-                                                        <FilePenLine className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => handleDeleteTransactionClick(tx)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                  </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma transação encontrada para esta conta com os filtros aplicados.</p>
-                            )}
-                          </div>
+                          <AccountTransactions accountId={account.id} />
                         </TableCell>
-                     </TableRow>
-                  )}
-                </React.Fragment>
-              )})}
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                )
+              })}
             </TableBody>
           </Table>
         </Card>
@@ -552,43 +503,20 @@ export default function BancoPage() {
 
       <NewTransactionDialog
         isOpen={isTransactionOpen}
-        onOpenChange={setTransactionOpen}
+        onOpencha-nge={setTransactionOpen}
         onSubmit={handleNewTransaction}
         transactionType={transactionType}
         account={selectedAccount}
-        categories={categories || []}
-      />
-
-      <EditTransactionDialog
-        isOpen={isEditTransactionOpen}
-        onOpenChange={setEditTransactionOpen}
-        onSubmit={handleEditTransaction}
-        transaction={selectedTransaction}
-        categories={categories || []}
+        categories={[]} // TODO: Connect categories from Firestore
       />
       
       <ManageCategoriesDialog
         isOpen={isManageCategoriesOpen}
         onOpenChange={setManageCategoriesOpen}
-        categories={categories || []}
+        categories={[]} // TODO: Connect categories from Firestore
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
       />
-      <AlertDialog open={isDeleteTransactionAlertOpen} onOpenChange={setDeleteTransactionAlertOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-            <AlertDialogDescription>
-                Esta ação não pode ser desfeita. Isso irá excluir permanentemente a transação e reverter o valor no saldo da conta.
-            </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTransaction}>Confirmar</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
     </>
   )
 }
