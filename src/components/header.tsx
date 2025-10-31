@@ -11,7 +11,6 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import UserNav from "@/components/user-nav"
 import { Button } from "./ui/button"
 import { PlusCircle, Calendar as CalendarIcon, Calculator } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
@@ -81,7 +80,6 @@ export default function Header() {
           </span>
         </Link>
       </Button>
-      <UserNav />
     </header>
   )
 }

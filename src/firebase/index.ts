@@ -50,4 +50,3 @@ export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
 export * from './firestore/utils';
-export * from './auth/use-user';

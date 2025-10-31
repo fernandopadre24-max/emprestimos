@@ -5,8 +5,10 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
-import { FirebaseClientProvider } from '@/firebase';
-import { AppContent } from '@/components/app-content';
+import MainSidebar from '@/components/main-sidebar';
+import Header from '@/components/header';
+import { SidebarProvider } from '@/components/ui/sidebar';
+
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
@@ -36,12 +38,16 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseClientProvider>
             <Toaster />
-             <AppContent>
-                {children}
-            </AppContent>
-          </FirebaseClientProvider>
+            <SidebarProvider>
+              <MainSidebar />
+              <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+                <Header />
+                <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+                  {children}
+                </main>
+              </div>
+            </SidebarProvider>
         </ThemeProvider>
       </body>
     </html>
