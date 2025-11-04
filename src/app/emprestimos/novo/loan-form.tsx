@@ -29,9 +29,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { useCollection, useFirestore } from "@/firebase";
-import { collection } from "firebase/firestore";
-import { addLoan } from "@/lib/loans";
 import { Skeleton } from "@/components/ui/skeleton";
 
 
@@ -53,13 +50,11 @@ interface Simulation {
 export default function LoanForm() {
   const { toast } = useToast();
   const router = useRouter();
-  const firestore = useFirestore();
-
-  const customersQuery = useMemo(() => collection(firestore, 'customers'), [firestore]);
-  const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
   
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
-  const { data: bankAccounts, isLoading: isLoadingBankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
+  // These would be fetched from your context or a hook in a real app
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const isLoading = false;
 
 
   const [simulation, setSimulation] = useState<Simulation | null>(null);
@@ -125,15 +120,8 @@ export default function LoanForm() {
         return;
     }
 
-    const newLoanData: Omit<Loan, 'id' | 'installments' | 'loanCode'> = {
-        ...values,
-        interestRate: values.interestRate / 100, // Convert percentage to decimal
-        lateFeeRate: values.lateFeeRate / 100, // Convert percentage to decimal
-        startDate: values.startDate.toISOString(),
-        status: 'Em dia',
-    };
-
-    addLoan(firestore, newLoanData);
+    // In a real app, this would call a server function to create the loan
+    console.log("New Loan Data:", values);
 
     toast({
       title: "Solicitação Enviada!",
@@ -146,8 +134,6 @@ export default function LoanForm() {
 
     router.push("/emprestimos");
   }
-  
-  const isLoading = isLoadingCustomers || isLoadingBankAccounts;
 
   return (
     <Form {...form}>

@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useMemo } from "react"
+import React from "react"
 import {
   Card,
   CardContent,
@@ -18,33 +18,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import type { Loan, Customer, BankAccount } from "@/lib/types"
-import { format, parseISO } from "date-fns"
-import { ptBR } from "date-fns/locale"
 import { CircleDollarSign, CreditCard, Users } from "lucide-react"
-import { useCollection, useFirestore } from "@/firebase"
-import { collection, query, orderBy, limit } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 
 export default function Dashboard() {
-  const firestore = useFirestore();
-
-  const loansQuery = useMemo(() => query(collection(firestore, 'loans'), orderBy('startDate', 'desc')), [firestore]);
-  const customersQuery = useMemo(() => collection(firestore, 'customers'), [firestore]);
-  const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
-
-  const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
-  const { data: bankAccounts, isLoading: isLoadingBankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   
-  const recentLoans = useMemo(() => (allLoans || []).slice(0, 5), [allLoans]);
-  const totalValue = useMemo(() => (allLoans || []).reduce((acc, loan) => acc + loan.amount, 0), [allLoans])
-  const totalCustomers = useMemo(() => (customers || []).length, [customers]);
-  const totalBalance = useMemo(() => (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0), [bankAccounts]);
-  
-  const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingBankAccounts;
+  const isLoading = false;
 
 
   return (
@@ -60,11 +41,11 @@ export default function Dashboard() {
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-3/4" /> :
             <div className="text-2xl font-bold font-headline">
-              {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              R$ 0,00
             </div>
             }
             <p className="text-xs text-muted-foreground">
-              Total de {(allLoans || []).length} empréstimos concedidos.
+              Total de 0 empréstimos concedidos.
             </p>
           </CardContent>
         </Card>
@@ -75,7 +56,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
              {isLoading ? <Skeleton className="h-8 w-1/4" /> :
-            <div className="text-2xl font-bold font-headline">+{totalCustomers}</div>
+            <div className="text-2xl font-bold font-headline">+0</div>
             }
             <p className="text-xs text-muted-foreground">
               Total de clientes cadastrados.
@@ -90,7 +71,7 @@ export default function Dashboard() {
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-3/4" /> :
             <div className="text-2xl font-bold font-headline text-primary">
-              {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              R$ 0,00
             </div>
             }
             <p className="text-xs text-muted-foreground">
@@ -128,29 +109,11 @@ export default function Dashboard() {
                         <TableCell className="text-right"><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                     </TableRow>
                 ))}
-                {!isLoading && recentLoans.map(loan => {
-                  const date = parseISO(loan.startDate);
-                  const customer = (customers || []).find(c => c.id === loan.customerId);
-                  return (
-                  <TableRow key={loan.id}>
-                    <TableCell>
-                      <div className="font-medium">{customer?.name}</div>
-                      <div className="hidden text-sm text-muted-foreground md:inline">
-                         {customer?.email}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono">{loan.loanCode}</TableCell>
-                    <TableCell>{loan.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {format(date, "dd/MM/yyyy", { locale: ptBR })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                       <Badge variant={loan.status === 'Pago' ? 'default' : loan.status === 'Atrasado' ? 'destructive' : 'secondary'} className={loan.status === 'Pago' ? "bg-accent text-accent-foreground" : ""}>
-                        {loan.status}
-                       </Badge>
-                    </TableCell>
-                  </TableRow>
-                )})}
+                {!isLoading && (
+                    <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum empréstimo recente.</TableCell>
+                    </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -180,15 +143,11 @@ export default function Dashboard() {
                         <TableCell className="text-right"><Skeleton className="h-4 w-24" /></TableCell>
                     </TableRow>
               ))}
-              {!isLoading && (bankAccounts || []).map((account) => (
-                <TableRow key={account.id}>
-                  <TableCell className="font-medium">{account.banco}</TableCell>
-                  <TableCell>{account.agencia} / {account.conta}</TableCell>
-                  <TableCell className={cn("text-right font-medium", account.saldo >= 0 ? 'text-green-600' : 'text-red-600')}>
-                    {account.saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </TableCell>
+              {!isLoading && (
+                 <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">Nenhuma conta bancária cadastrada.</TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -49,12 +49,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
-
-import { useCollection, useFirestore } from "@/firebase"
-import { collection, query } from "firebase/firestore"
-import { addBankAccount, updateBankAccount, deleteBankAccount } from "@/lib/bank"
-import { addTransaction, updateTransaction, deleteTransaction } from "@/lib/transactions"
-import { addCategory, deleteCategory } from "@/lib/categories"
 import { Skeleton } from "@/components/ui/skeleton"
 
 interface FilterState {
@@ -70,13 +64,8 @@ const initialFilterState: FilterState = {
 };
 
 function AccountTransactions({ accountId, categories }: { accountId: string, categories: Category[] }) {
-  const firestore = useFirestore();
-  const transactionsQuery = useMemo(() => {
-    if (!firestore || !accountId) return null;
-    return query(collection(firestore, `bankAccounts/${accountId}/transactions`));
-  }, [firestore, accountId]);
-
-  const { data: transactions, isLoading } = useCollection<Transaction>(transactionsQuery);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const isLoading = false;
 
   const [filters, setFilters] = useState<FilterState>(initialFilterState);
   const [isEditTransactionOpen, setEditTransactionOpen] = useState(false);
@@ -119,7 +108,7 @@ function AccountTransactions({ accountId, categories }: { accountId: string, cat
 
   const handleEditTransaction = (editedTransactionData: Partial<Transaction>) => {
     if (!selectedTransaction) return;
-    updateTransaction(firestore, accountId, selectedTransaction.id, editedTransactionData);
+    setTransactions(prev => prev.map(t => t.id === selectedTransaction.id ? { ...t, ...editedTransactionData } : t));
     setEditTransactionOpen(false);
   };
 
@@ -130,7 +119,7 @@ function AccountTransactions({ accountId, categories }: { accountId: string, cat
 
   const handleDeleteTransaction = () => {
     if (!selectedTransaction) return;
-    deleteTransaction(firestore, accountId, selectedTransaction.id, selectedTransaction.amount, selectedTransaction.type);
+    setTransactions(prev => prev.filter(t => t.id !== selectedTransaction.id));
     setDeleteTransactionAlertOpen(false);
   };
 
@@ -240,12 +229,9 @@ function AccountTransactions({ accountId, categories }: { accountId: string, cat
 }
 
 export default function BancoPage() {
-  const firestore = useFirestore();
-  const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
-  const categoriesQuery = useMemo(() => collection(firestore, 'categories'), [firestore]);
-  
-  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
-  const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const isLoading = false;
 
   const totalBalance = useMemo(() => {
     return (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
@@ -274,34 +260,35 @@ export default function BancoPage() {
   }
 
   const handleAddAccount = (newAccountData: NewBankAccount) => {
-    addBankAccount(firestore, newAccountData);
+    const newAccount = { ...newAccountData, id: `BA${Date.now()}`, saldo: 0 };
+    setBankAccounts(prev => [...prev, newAccount]);
     setAddAccountOpen(false);
   }
 
   const handleEditAccount = (editedAccountData: Partial<BankAccount>) => {
     if (!selectedAccount) return;
-    updateBankAccount(firestore, selectedAccount.id, editedAccountData);
+    setBankAccounts(prev => prev.map(acc => acc.id === selectedAccount.id ? { ...acc, ...editedAccountData } : acc));
     setEditAccountOpen(false);
   }
   
   const handleDeleteAccount = (accountId: string) => {
-    // Note: This does not delete sub-collections of transactions.
-    // A cloud function would be needed for that in a production app.
-    deleteBankAccount(firestore, accountId);
+    setBankAccounts(prev => prev.filter(acc => acc.id !== accountId));
   }
 
   const handleNewTransaction = (transactionData: Omit<Transaction, 'id' | 'accountId' | 'type' | 'date'>) => {
     if (!selectedAccount) return;
-    addTransaction(firestore, selectedAccount.id, transactionData, transactionType);
+    const amountToUpdate = transactionType === 'receita' ? transactionData.amount : -transactionData.amount;
+    setBankAccounts(prev => prev.map(acc => acc.id === selectedAccount.id ? { ...acc, saldo: acc.saldo + amountToUpdate } : acc));
+    // In a real app, you would also add the transaction to a list of transactions for the account
     setTransactionOpen(false);
   }
 
   const handleAddCategory = (category: Omit<Category, 'id'>) => {
-    addCategory(firestore, category);
+    const newCategory = { ...category, id: `CAT${Date.now()}` };
+    setCategories(prev => [...prev, newCategory]);
   }
-
   const handleDeleteCategory = (categoryId: string) => {
-    deleteCategory(firestore, categoryId);
+    setCategories(prev => prev.filter(cat => cat.id !== categoryId));
   }
 
   const toggleRow = (id: string) => {
@@ -309,8 +296,6 @@ export default function BancoPage() {
       current.includes(id) ? current.filter(rowId => rowId !== id) : [...current, id]
     );
   }
-  
-  const isLoading = isLoadingAccounts || isLoadingCategories;
   
   return (
     <>
@@ -372,7 +357,12 @@ export default function BancoPage() {
                   <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
                 </TableRow>
               ))}
-              {!isLoading && bankAccounts?.map((account: BankAccount) => {
+              {!isLoading && bankAccounts.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">Nenhuma conta cadastrada.</TableCell>
+                </TableRow>
+              )}
+              {!isLoading && bankAccounts.map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
                 return (
                   <React.Fragment key={account.id}>
