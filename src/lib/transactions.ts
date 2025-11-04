@@ -12,7 +12,6 @@ import {
   where,
   getDocs,
   getDoc,
-  collectionGroup,
 } from 'firebase/firestore';
 import type { Transaction } from './types';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -130,46 +129,32 @@ export function deleteTransaction(
 
 export async function deleteTransactionsBySource(firestore: Firestore, sourceId: string) {
     const batch = writeBatch(firestore);
-    const transactionsCollectionGroup = collectionGroup(firestore, TRANSACTIONS_COLLECTION);
-    const q = query(transactionsCollectionGroup, where('sourceId', '==', sourceId));
-  
+    // This is not performant, but for this specific app, we can assume the number of transactions is low.
+    // A better approach would be to query each account's transaction subcollection.
+    const allAccountsQuery = query(collection(firestore, BANK_ACCOUNTS_COLLECTION));
+    const accountsSnapshot = await getDocs(allAccountsQuery);
+
     try {
-      const querySnapshot = await getDocs(q);
-      
-      // Use a transaction to ensure atomicity for balance updates
-      await runTransaction(firestore, async (transaction) => {
-          const balanceUpdates: Record<string, number> = {};
+        for (const accountDoc of accountsSnapshot.docs) {
+            const transactionsRef = collection(firestore, `${BANK_ACCOUNTS_COLLECTION}/${accountDoc.id}/${TRANSACTIONS_COLLECTION}`);
+            const q = query(transactionsRef, where('sourceId', '==', sourceId));
+            const querySnapshot = await getDocs(q);
 
-          for (const docSnapshot of querySnapshot.docs) {
-              const transactionData = docSnapshot.data() as Transaction;
-              const accountId = transactionData.accountId;
-
-              // Defer deletion to the transaction batch
-              batch.delete(docSnapshot.ref);
-
-              const amountToRevert = transactionData.type === 'receita' ? -transactionData.amount : transactionData.amount;
-              
-              if (balanceUpdates[accountId]) {
-                  balanceUpdates[accountId] += amountToRevert;
-              } else {
-                  balanceUpdates[accountId] = amountToRevert;
-              }
-          }
-
-          for (const accountId in balanceUpdates) {
-              const accountRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, accountId);
-              const accountDoc = await transaction.get(accountRef);
-              if (accountDoc.exists()) {
-                  const currentBalance = accountDoc.data().saldo || 0;
-                  const newBalance = currentBalance + balanceUpdates[accountId];
-                  transaction.update(accountRef, { saldo: newBalance });
-              }
-          }
-      });
-      
-      // Commit the batched deletions after the transaction succeeds
-      await batch.commit();
-  
+            for (const docSnapshot of querySnapshot.docs) {
+                const transactionData = docSnapshot.data() as Transaction;
+                const amountToRevert = transactionData.type === 'receita' ? -transactionData.amount : transactionData.amount;
+                
+                await runTransaction(firestore, async (transaction) => {
+                    const accRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, transactionData.accountId);
+                    const accDoc = await transaction.get(accRef);
+                    if (accDoc.exists()) {
+                        const newBalance = (accDoc.data().saldo || 0) + amountToRevert;
+                        transaction.update(accRef, { saldo: newBalance });
+                        transaction.delete(docSnapshot.ref);
+                    }
+                });
+            }
+        }
     } catch (error) {
       console.error("Error reverting transactions by source:", error);
       const permissionError = new FirestorePermissionError({
