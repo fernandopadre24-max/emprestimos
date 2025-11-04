@@ -7,15 +7,19 @@ import {
   runTransaction,
   Firestore,
 } from 'firebase/firestore';
-import type { BankAccount } from './types';
+import type { BankAccount, NewBankAccount } from './types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 const BANK_ACCOUNTS_COLLECTION = 'bankAccounts';
 
-export function addBankAccount(firestore: Firestore, account: Omit<BankAccount, 'id'>) {
+export function addBankAccount(firestore: Firestore, account: NewBankAccount) {
+  const newAccount: Omit<BankAccount, 'id'> = {
+    ...account,
+    saldo: 0,
+  };
   const coll = collection(firestore, BANK_ACCOUNTS_COLLECTION);
-  addDoc(coll, account).catch(async (serverError) => {
+  addDoc(coll, newAccount).catch(async (serverError) => {
     const permissionError = new FirestorePermissionError({
       path: coll.path,
       operation: 'create',

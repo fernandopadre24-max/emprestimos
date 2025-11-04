@@ -16,7 +16,6 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   ChevronDown,
-  CircleDollarSign,
   CreditCard,
   Trash2,
   FilePenLine,
@@ -275,11 +274,7 @@ export default function BancoPage() {
   }
 
   const handleAddAccount = (newAccountData: NewBankAccount) => {
-    const newAccount: Omit<BankAccount, 'id'> = {
-      saldo: 0,
-      ...newAccountData
-    };
-    addBankAccount(firestore, newAccount);
+    addBankAccount(firestore, newAccountData);
     setAddAccountOpen(false);
   }
 
@@ -337,24 +332,22 @@ export default function BancoPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Saldo Total em Contas
-              </CardTitle>
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-              <div className="text-2xl font-bold font-headline text-primary">
-                {totalBalance.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </div>
-              }
-              <p className="text-xs text-muted-foreground">Soma dos saldos bancários</p>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Saldo Total em Contas
+            </CardTitle>
+            <CreditCard className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> :
+            <div className="text-2xl font-bold font-headline text-primary">
+              {totalBalance.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </div>
+            }
+            <p className="text-xs text-muted-foreground">Soma dos saldos bancários disponíveis</p>
+          </CardContent>
+        </Card>
 
         <Card>
           <Table>

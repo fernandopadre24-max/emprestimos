@@ -10,16 +10,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "@/components/ui/chart"
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,26 +18,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
-import type { ChartConfig } from "@/components/ui/chart"
-import { format, parseISO, getMonth } from "date-fns"
+import type { Loan, Customer, BankAccount } from "@/lib/types"
+import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CircleDollarSign, CreditCard, TrendingUp, Users } from "lucide-react"
+import { CircleDollarSign, CreditCard, Users } from "lucide-react"
 import { useCollection, useFirestore } from "@/firebase"
 import { collection, query, orderBy, limit } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
-
-const chartConfig = {
-  emprestimos: {
-    label: "Empréstimos",
-    color: "hsl(var(--chart-1))",
-  },
-  juros: {
-    label: "Juros Recebidos",
-    color: "hsl(var(--chart-2))",
-  },
-} satisfies ChartConfig
 
 export default function Dashboard() {
   const firestore = useFirestore();
@@ -61,56 +40,16 @@ export default function Dashboard() {
   const { data: bankAccounts, isLoading: isLoadingBankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   
   const recentLoans = useMemo(() => (allLoans || []).slice(0, 5), [allLoans]);
-
-  const balanceChartData = useMemo(() => {
-    const monthlyData: { month: string; emprestimos: number; juros: number; }[] = Array.from({ length: 12 }, (_, i) => ({
-      month: format(new Date(new Date().getFullYear(), i, 1), "MMM", { locale: ptBR }),
-      emprestimos: 0,
-      juros: 0,
-    }));
-  
-    (allLoans || []).forEach(loan => {
-        try {
-            const startDate = parseISO(loan.startDate);
-            if (startDate.getFullYear() === new Date().getFullYear()) {
-              const monthIndex = getMonth(startDate);
-              monthlyData[monthIndex].emprestimos += loan.amount;
-            }
-
-        } catch (e) {
-            console.warn("Invalid loan date", loan);
-        }
-    });
-  
-    return monthlyData;
-  }, [allLoans]);
-
-
   const totalValue = useMemo(() => (allLoans || []).reduce((acc, loan) => acc + loan.amount, 0), [allLoans])
   const totalCustomers = useMemo(() => (customers || []).length, [customers]);
   const totalBalance = useMemo(() => (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0), [bankAccounts]);
-  
-  const profitability = useMemo(() => {
-    if (!allLoans) return 0;
-    return allLoans.reduce((acc, loan) => {
-        const totalPaid = (loan.installments || []).reduce((sum, inst) => {
-            return sum + (inst.status === 'Paga' ? (inst.paidAmount || inst.amount) : 0);
-        }, 0);
-        
-        if (totalPaid > loan.amount) {
-            return acc + (totalPaid - loan.amount);
-        }
-        return acc;
-    }, 0);
-  }, [allLoans]);
-    
   
   const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingBankAccounts;
 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -145,28 +84,12 @@ export default function Dashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lucratividade (Juros)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-            <div className="text-2xl font-bold font-headline text-green-600">
-              {profitability.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </div>
-            }
-            <p className="text-xs text-muted-foreground">
-              Lucro total estimado dos juros.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Saldo Total em Contas</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-            <div className="text-2xl font-bold font-headline">
+            <div className="text-2xl font-bold font-headline text-primary">
               {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             }
@@ -177,7 +100,7 @@ export default function Dashboard() {
         </Card>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+        <Card className="lg:col-span-7">
           <CardHeader>
             <CardTitle className="font-headline">Empréstimos Recentes</CardTitle>
             <CardDescription>
@@ -231,29 +154,6 @@ export default function Dashboard() {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
-        <Card className="lg:col-span-3">
-            <CardHeader>
-                <div className="flex justify-between items-center">
-                    <div>
-                        <CardTitle className="font-headline">Balanço Mensal</CardTitle>
-                        <CardDescription>Empréstimos concedidos neste ano.</CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="pl-2">
-              {isLoadingLoans ? <Skeleton className="w-full h-[300px]" /> :
-                <ChartContainer config={chartConfig} className="w-full h-[300px]">
-                    <BarChart data={balanceChartData}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                        <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                        <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
-                    </BarChart>
-                </ChartContainer>
-                }
-            </CardContent>
         </Card>
       </div>
       <Card>
