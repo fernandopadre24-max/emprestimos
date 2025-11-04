@@ -8,6 +8,8 @@ import type { Firestore } from "firebase/firestore";
 import { initializeFirebase } from ".";
 import { FirebaseProvider } from "./provider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePathname } from "next/navigation";
+
 
 interface FirebaseClientProviderProps {
   children: React.ReactNode;
@@ -22,6 +24,8 @@ export default function FirebaseClientProvider({
     firestore: Firestore;
   } | null>(null);
 
+  const pathname = usePathname();
+
   useEffect(() => {
     // Initialize Firebase on the client-side
     const services = initializeFirebase();
@@ -30,6 +34,10 @@ export default function FirebaseClientProvider({
 
   if (!firebase) {
     // Render a loading state while Firebase is initializing
+    // Don't show loading skeleton on login page
+    if (pathname === '/login') {
+        return <div className="flex h-screen w-full items-center justify-center"><p>Carregando...</p></div>
+    }
     return (
        <div className="flex flex-col h-screen">
           <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-muted/40 px-6">
