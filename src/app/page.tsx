@@ -32,7 +32,7 @@ import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO, getMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { CircleDollarSign, CreditCard, TrendingUp } from "lucide-react"
+import { CircleDollarSign, CreditCard, TrendingUp, Users } from "lucide-react"
 import { useCollection, useFirestore } from "@/firebase"
 import { collection, query, orderBy, limit } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -71,17 +71,11 @@ export default function Dashboard() {
   
     (allLoans || []).forEach(loan => {
         try {
-            const monthIndex = getMonth(parseISO(loan.startDate));
-            monthlyData[monthIndex].emprestimos += loan.amount;
-
-            loan.installments.forEach(inst => {
-                if (inst.status === 'Paga' && inst.paidAmount) {
-                    const interestPortion = inst.paidAmount - (inst.originalAmount / (1 + loan.interestRate));
-                    if (interestPortion > 0) {
-                        monthlyData[monthIndex].juros += interestPortion;
-                    }
-                }
-            })
+            const startDate = parseISO(loan.startDate);
+            if (startDate.getFullYear() === new Date().getFullYear()) {
+              const monthIndex = getMonth(startDate);
+              monthlyData[monthIndex].emprestimos += loan.amount;
+            }
 
         } catch (e) {
             console.warn("Invalid loan date", loan);
@@ -96,15 +90,19 @@ export default function Dashboard() {
   const totalCustomers = useMemo(() => (customers || []).length, [customers]);
   const totalBalance = useMemo(() => (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0), [bankAccounts]);
   
-  const profitability = useMemo(() => (allLoans || []).reduce((acc, loan) => {
-    if (!loan.installments) return acc;
-    const totalPaid = loan.installments.reduce((sum, inst) => sum + (inst.paidAmount || 0), 0);
-    if(totalPaid > 0) {
-        const interest = totalPaid - loan.amount;
-        return acc + (interest > 0 ? interest : 0);
-    }
-    return acc;
-  }, 0), [allLoans]);
+  const profitability = useMemo(() => {
+    if (!allLoans) return 0;
+    return allLoans.reduce((acc, loan) => {
+        const totalPaid = (loan.installments || []).reduce((sum, inst) => {
+            return sum + (inst.status === 'Paga' ? (inst.paidAmount || inst.amount) : 0);
+        }, 0);
+        
+        if (totalPaid > loan.amount) {
+            return acc + (totalPaid - loan.amount);
+        }
+        return acc;
+    }, 0);
+  }, [allLoans]);
     
   
   const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingBankAccounts;
@@ -134,21 +132,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              className="h-4 w-4 text-muted-foreground"
-            >
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
              {isLoading ? <Skeleton className="h-8 w-1/4" /> :
@@ -171,7 +155,7 @@ export default function Dashboard() {
             </div>
             }
             <p className="text-xs text-muted-foreground">
-              Lucro total dos juros pagos.
+              Lucro total estimado dos juros.
             </p>
           </CardContent>
         </Card>
@@ -253,7 +237,7 @@ export default function Dashboard() {
                 <div className="flex justify-between items-center">
                     <div>
                         <CardTitle className="font-headline">Balanço Mensal</CardTitle>
-                        <CardDescription>Empréstimos concedidos vs. Juros recebidos</CardDescription>
+                        <CardDescription>Empréstimos concedidos neste ano.</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -266,7 +250,6 @@ export default function Dashboard() {
                         <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                         <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
-                        <Bar dataKey="juros" fill="var(--color-juros)" radius={4} />
                     </BarChart>
                 </ChartContainer>
                 }
