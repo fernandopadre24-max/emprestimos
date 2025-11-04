@@ -22,13 +22,22 @@ import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dia
 import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useCollection, useFirestore } from "@/firebase"
+import { collection, query, runTransaction } from "firebase/firestore"
+import { deleteLoan, updateLoan } from "@/lib/loans"
+import { addTransaction, deleteTransactionsBySource } from "@/lib/transactions"
+import { useToast } from "@/hooks/use-toast"
 
 
 export default function EmprestimosPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const isLoading = false;
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(query(collection(firestore, "loans")));
+  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(query(collection(firestore, "customers")));
+  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(query(collection(firestore, "bankAccounts")));
+
+  const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingAccounts;
 
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<string[]>([]);
   const [expandedLoanIds, setExpandedLoanIds] = useState<string[]>([]);
@@ -36,7 +45,8 @@ export default function EmprestimosPage() {
   const [isCreditDialogOpen, setCreditDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
-  const [paymentDetails, setPaymentDetails] = useState<{loanId: string, installment: Installment} | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<{loanId: string, installment: Installment & { lateFee?: number }} | null>(null);
+
 
   const calculateLateFee = (installment: Installment, loan: Loan): number => {
     const amountDue = (installment.originalAmount || installment.amount) - (installment.paidAmount || 0);
@@ -76,11 +86,14 @@ export default function EmprestimosPage() {
       return acc;
     }, {} as Record<string, Customer & { loans: Loan[] }>);
 
-    return Object.values(customerLoanMap);
+    return Object.values(customerLoanMap).sort((a,b) => a.name.localeCompare(b.name));
   }, [loans, customers]);
 
-  const handleDeleteLoan = (loanId: string) => {
-    setLoans(prev => prev.filter(l => l.id !== loanId));
+  const handleDeleteLoan = async (loan: Loan) => {
+    // Before deleting the loan, revert any disbursement transaction associated with it.
+    await deleteTransactionsBySource(firestore, loan.id);
+    deleteLoan(firestore, loan.id);
+    toast({ title: "Empréstimo Excluído", description: `O empréstimo ${loan.loanCode} foi excluído.` });
   }
 
   const handleEditLoanClick = (loan: Loan) => {
@@ -90,7 +103,7 @@ export default function EmprestimosPage() {
 
   const handleEditLoan = (editedLoanData: Partial<Loan>) => {
     if (!selectedLoan) return;
-    setLoans(prev => prev.map(l => l.id === selectedLoan.id ? { ...l, ...editedLoanData } : l));
+    updateLoan(firestore, selectedLoan.id, editedLoanData);
     setEditDialogOpen(false);
   };
 
@@ -102,52 +115,69 @@ export default function EmprestimosPage() {
       setPaymentDetails({ loanId: loan.id, installment: installmentWithFee });
       setCreditDialogOpen(true);
     } else {
-      handleRevertPayment(loan.id, installment.id);
+      handleRevertPayment(loan, installment);
     }
   };
   
   const handleConfirmPayment = async (loanId: string, installmentId: string, accountId: string, amountPaid: number) => {
-    // In a real app, this would involve server-side logic
-    setLoans(prevLoans => {
-      const newLoans = prevLoans.map(loan => {
-        if (loan.id === loanId) {
-          const newInstallments = loan.installments.map(inst => {
+    await runTransaction(firestore, async (transaction) => {
+        const loanRef = collection(firestore, 'loans');
+        const loanDoc = (await getDocs(query(loanRef, where('id', '==', loanId)))).docs[0];
+        if (!loanDoc) throw new Error("Loan not found");
+
+        const currentLoan = loanDoc.data() as Loan;
+        const newInstallments = currentLoan.installments.map(inst => {
             if (inst.id === installmentId) {
-              const newPaidAmount = (inst.paidAmount || 0) + amountPaid;
-              const originalAmount = inst.originalAmount || inst.amount;
-              const isFullyPaid = newPaidAmount >= originalAmount;
-              return { ...inst, paidAmount: newPaidAmount, status: isFullyPaid ? 'Paga' as const : 'Pendente' as const };
+                const newPaidAmount = (inst.paidAmount || 0) + amountPaid;
+                const originalAmount = inst.originalAmount || inst.amount;
+                const isFullyPaid = newPaidAmount >= originalAmount;
+                return { ...inst, paidAmount: newPaidAmount, status: isFullyPaid ? 'Paga' as const : 'Pendente' as const };
             }
             return inst;
-          });
-          const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
-          const newLoanStatus = allInstallmentsPaid ? 'Pago' : 'Em dia';
-          return { ...loan, installments: newInstallments, status: newLoanStatus };
-        }
-        return loan;
-      });
-      return newLoans;
+        });
+
+        const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
+        const newLoanStatus = allInstallmentsPaid ? 'Pago' : currentLoan.status;
+        
+        transaction.update(loanDoc.ref, { installments: newInstallments, status: newLoanStatus });
+
+         // Add transaction to bank account
+        const customer = customers?.find(c => c.id === currentLoan.customerId);
+        addTransaction(firestore, accountId, {
+            description: `Pagamento Parcela ${newInstallments.find(i=>i.id===installmentId)?.installmentNumber} - ${customer?.name}`,
+            amount: amountPaid,
+            category: 'Receita Empréstimo',
+            sourceId: installmentId,
+        }, 'receita');
     });
 
     setCreditDialogOpen(false);
+    toast({ title: "Pagamento Confirmado", description: "O pagamento da parcela foi registrado com sucesso.", className: "bg-accent text-accent-foreground" });
   };
   
-  const handleRevertPayment = async (loanId: string, installmentId: string) => {
-     setLoans(prevLoans => {
-      const newLoans = prevLoans.map(loan => {
-        if (loan.id === loanId) {
-          const newInstallments = loan.installments.map(inst => {
-            if (inst.id === installmentId) {
-              return { ...inst, status: 'Pendente' as const, paidAmount: 0 };
+  const handleRevertPayment = async (loan: Loan, installment: Installment) => {
+     await runTransaction(firestore, async (transaction) => {
+        const loanRef = collection(firestore, 'loans');
+        const loanDoc = (await getDocs(query(loanRef, where('id', '==', loan.id)))).docs[0];
+        if (!loanDoc) throw new Error("Loan not found");
+
+        const newInstallments = loan.installments.map(inst => {
+            if (inst.id === installment.id) {
+            return { ...inst, status: 'Pendente' as const, paidAmount: 0 };
             }
             return inst;
-          });
-           return { ...loan, installments: newInstallments, status: 'Em dia' };
-        }
-        return loan;
-      });
-      return newLoans;
-    });
+        });
+        
+        const wasPaid = loan.status === 'Pago';
+        const newLoanStatus = wasPaid ? 'Em dia' : loan.status;
+
+        transaction.update(loanDoc.ref, { installments: newInstallments, status: newLoanStatus });
+     });
+    
+    // Also revert the transaction from the bank account
+    await deleteTransactionsBySource(firestore, installment.id);
+
+    toast({ title: "Pagamento Revertido", description: "O pagamento da parcela foi revertido." });
   };
 
   const toggleCustomer = (customerId: string) => {
@@ -269,7 +299,7 @@ export default function EmprestimosPage() {
                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); handleEditLoanClick(loan)}}>
                                                         <FilePenLine className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDeleteLoan(loan.id)}}>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={(e) => {e.stopPropagation(); handleDeleteLoan(loan)}}>
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                 </div>
@@ -357,3 +387,5 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
+    

@@ -21,10 +21,14 @@ import { AddCustomerDialog } from "@/components/clientes/add-customer-dialog"
 import { EditCustomerDialog } from "@/components/clientes/edit-customer-dialog"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useCollection, useFirestore } from "@/firebase"
+import { collection, query } from "firebase/firestore"
+import { addCustomer, deleteCustomer, updateCustomer } from "@/lib/customers"
 
 export default function ClientesPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const isLoading = false;
+  const firestore = useFirestore();
+  const { data: customers, isLoading } = useCollection<Customer>(query(collection(firestore, "customers")));
+
 
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -33,13 +37,12 @@ export default function ClientesPage() {
 
 
   const handleAddCustomer = async (newCustomerData: Omit<Customer, 'id' | 'registrationDate' | 'loanStatus'>) => {
-    const newCustomer: Customer = {
+    const newCustomer: Omit<Customer, 'id'> = {
       ...newCustomerData,
-      id: `C${Date.now()}`,
       registrationDate: new Date().toISOString(),
       loanStatus: 'Ativo',
     };
-    setCustomers(prev => [...prev, newCustomer]);
+    addCustomer(firestore, newCustomer);
     setAddDialogOpen(false);
   }
 
@@ -50,12 +53,12 @@ export default function ClientesPage() {
   
   const handleEditCustomer = async (editedCustomerData: Partial<Customer>) => {
     if (!selectedCustomer) return;
-    setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, ...editedCustomerData } : c));
+    updateCustomer(firestore, selectedCustomer.id, editedCustomerData);
     setEditDialogOpen(false);
   }
 
   const handleDeleteCustomer = (customerId: string) => {
-    setCustomers(prev => prev.filter(c => c.id !== customerId));
+    deleteCustomer(firestore, customerId);
   }
 
   const toggleRow = (id: string) => {
@@ -103,12 +106,12 @@ export default function ClientesPage() {
                   <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
                 </TableRow>
               ))}
-              {!isLoading && customers.length === 0 && (
+              {!isLoading && (customers || []).length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">Nenhum cliente cadastrado.</TableCell>
                 </TableRow>
               )}
-              {!isLoading && customers.map((customer: Customer) => {
+              {!isLoading && (customers || []).map((customer: Customer) => {
                 const isExpanded = expandedRows.includes(customer.id);
                 const date = parseISO(customer.registrationDate);
                 return (
@@ -180,3 +183,5 @@ export default function ClientesPage() {
     </>
   )
 }
+
+    

@@ -30,10 +30,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCollection, useFirestore } from "@/firebase";
+import { collection, query } from "firebase/firestore";
+import { addLoan } from "@/lib/loans";
+import { addTransaction } from "@/lib/transactions";
 
 
 const formSchema = z.object({
   customerId: z.string({ required_error: "Por favor, selecione um cliente." }),
+  accountId: z.string({ required_error: "Por favor, selecione uma conta de débito." }),
   amount: z.coerce.number().min(1, "O valor deve ser maior que zero."),
   interestRate: z.coerce.number().min(0, "A taxa de juros não pode ser negativa."),
   term: z.coerce.number().int().min(1, "O prazo deve ser de pelo menos 1 mês."),
@@ -50,20 +55,14 @@ interface Simulation {
 export default function LoanForm() {
   const { toast } = useToast();
   const router = useRouter();
-  
-  // These would be fetched from your context or a hook in a real app
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const isLoading = false;
+  const firestore = useFirestore();
 
+  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(query(collection(firestore, "customers")));
+  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(query(collection(firestore, "bankAccounts")));
+  const isLoading = isLoadingCustomers || isLoadingAccounts;
 
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   
-  const availableBalance = useMemo(() => {
-    return (bankAccounts || []).reduce((acc, doc) => acc + doc.saldo, 0);
-  }, [bankAccounts]);
-
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -74,6 +73,14 @@ export default function LoanForm() {
       lateFeeRate: 3,
     },
   });
+  
+  const selectedAccountId = form.watch("accountId");
+  const availableBalance = useMemo(() => {
+    if (!selectedAccountId || !bankAccounts) return 0;
+    const selectedAccount = bankAccounts.find(acc => acc.id === selectedAccountId);
+    return selectedAccount?.saldo || 0;
+  }, [bankAccounts, selectedAccountId]);
+
 
   function calculateLoan() {
     const values = form.getValues();
@@ -104,7 +111,7 @@ export default function LoanForm() {
         toast({
             variant: "destructive",
             title: "Saldo Insuficiente",
-            description: `O valor do empréstimo (R$ ${values.amount.toFixed(2)}) excede o saldo disponível em contas (R$ ${availableBalance.toFixed(2)}).`,
+            description: `O valor do empréstimo (R$ ${values.amount.toFixed(2)}) excede o saldo disponível na conta selecionada (R$ ${availableBalance.toFixed(2)}).`,
         });
         return;
     }
@@ -119,20 +126,48 @@ export default function LoanForm() {
         });
         return;
     }
-
-    // In a real app, this would call a server function to create the loan
-    console.log("New Loan Data:", values);
-
-    toast({
-      title: "Solicitação Enviada!",
-      description: "Sua solicitação de empréstimo foi enviada com sucesso.",
-      className: "bg-accent text-accent-foreground"
-    });
     
-    form.reset();
-    setSimulation(null);
+    const loanData: Omit<Loan, 'id' | 'installments' | 'loanCode'> = {
+        customerId: values.customerId,
+        amount: values.amount,
+        interestRate: values.interestRate / 100, // Store as decimal
+        term: values.term,
+        startDate: values.startDate.toISOString(),
+        status: 'Em dia',
+        lateFeeRate: values.lateFeeRate / 100, // Store as decimal
+    };
 
-    router.push("/emprestimos");
+    try {
+        const loanId = await addLoan(firestore, loanData);
+
+        // Add a transaction for the loan disbursement
+        addTransaction(firestore, values.accountId, {
+            description: `Desembolso Empréstimo para ${customer.name}`,
+            amount: values.amount,
+            category: 'Despesa Empréstimo',
+            sourceId: loanId, // Link transaction to the loan
+        }, 'despesa');
+
+
+        toast({
+        title: "Solicitação Enviada!",
+        description: "Sua solicitação de empréstimo foi enviada com sucesso.",
+        className: "bg-accent text-accent-foreground"
+        });
+        
+        form.reset();
+        setSimulation(null);
+
+        router.push("/emprestimos");
+
+    } catch (error) {
+        console.error("Failed to create loan:", error);
+        toast({
+            variant: "destructive",
+            title: "Erro ao criar empréstimo",
+            description: "Ocorreu um erro ao salvar o empréstimo. Tente novamente.",
+        });
+    }
   }
 
   return (
@@ -141,6 +176,7 @@ export default function LoanForm() {
         {isLoading ? (
             <div className="space-y-6">
                 <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-8 w-48 pt-4" />
                 <Skeleton className="h-10 w-full" />
@@ -159,7 +195,7 @@ export default function LoanForm() {
             </div>
         ) : (
         <div className="space-y-6">
-          <h3 className="text-lg font-medium font-headline">Informações do Cliente</h3>
+          <h3 className="text-lg font-medium font-headline">Informações do Cliente e Conta</h3>
             <FormField
               control={form.control}
               name="customerId"
@@ -180,13 +216,38 @@ export default function LoanForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormDescription>
-                    Selecione o cliente para o qual o empréstimo será concedido.
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="accountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Conta para Débito</FormLabel>
+                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma conta" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {(bankAccounts || []).map(account => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.banco} ({account.conta}) - Saldo: {account.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                   <FormDescription>
+                    O valor do empréstimo será debitado desta conta.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
 
           <h3 className="text-lg font-medium font-headline pt-4">Detalhes do Empréstimo</h3>
            <FormField
@@ -219,9 +280,6 @@ export default function LoanForm() {
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
                         initialFocus
                         locale={ptBR}
                       />
@@ -339,3 +397,5 @@ export default function LoanForm() {
     </Form>
   );
 }
+
+    
