@@ -64,4 +64,3 @@ export default function FirebaseClientProvider({
 
   return <FirebaseProvider value={firebase}>{children}</FirebaseProvider>;
 }
-

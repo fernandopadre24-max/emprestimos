@@ -244,11 +244,27 @@ export default function BancoPage() {
   const firestore = useFirestore();
   const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
   const categoriesQuery = useMemo(() => collection(firestore, 'categories'), [firestore]);
-  const transactionsQuery = useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]);
 
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
-  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(transactionsQuery);
+  
+  // State to hold transactions for summary cards
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+
+  useEffect(() => {
+    async function fetchAllTransactions() {
+      if (!firestore) return;
+      setIsLoadingTransactions(true);
+      const transGroup = collectionGroup(firestore, 'transactions');
+      const querySnapshot = await getDocs(transGroup);
+      const transactionsData = querySnapshot.docs.map(doc => doc.data() as Transaction);
+      setAllTransactions(transactionsData);
+      setIsLoadingTransactions(false);
+    }
+    fetchAllTransactions();
+  }, [firestore]);
+
 
   const bankSummary = useMemo(() => {
     const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
@@ -358,9 +374,11 @@ export default function BancoPage() {
               <ArrowUpCircle className="h-5 w-5 text-green-600" />
             </CardHeader>
             <CardContent>
+              {isLoading ? <Skeleton className="h-8 w-3/4" /> : 
               <div className="text-2xl font-bold font-headline text-green-800">
                 {bankSummary.receitas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
+              }
               <p className="text-xs text-green-700">
                 Total de entradas do período
               </p>
@@ -374,9 +392,11 @@ export default function BancoPage() {
               <ArrowDownCircle className="h-5 w-5 text-red-600" />
             </CardHeader>
             <CardContent>
+              {isLoading ? <Skeleton className="h-8 w-3/4" /> : 
               <div className="text-2xl font-bold font-headline text-red-800">
                 {bankSummary.despesas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
+              }
               <p className="text-xs text-red-700">Total de saídas do período</p>
             </CardContent>
           </Card>
@@ -388,9 +408,11 @@ export default function BancoPage() {
               <CircleDollarSign className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
+              {isLoading ? <Skeleton className="h-8 w-3/4" /> : 
               <div className="text-2xl font-bold font-headline text-blue-800">
                 {bankSummary.balanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
+              }
               <p className="text-xs text-blue-700">Receitas - Despesas</p>
             </CardContent>
           </Card>
@@ -402,9 +424,11 @@ export default function BancoPage() {
               <CreditCard className="h-5 w-5 text-purple-600" />
             </CardHeader>
             <CardContent>
+              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
               <div className="text-2xl font-bold font-headline text-purple-800">
                 {bankSummary.saldoContas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
+              }
               <p className="text-xs text-purple-700">Soma dos saldos bancários</p>
             </CardContent>
           </Card>
@@ -513,5 +537,3 @@ export default function BancoPage() {
     </>
   )
 }
-
-    
