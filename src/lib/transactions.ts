@@ -73,26 +73,26 @@ export async function updateTransaction(
             const originalTransaction = transactionDoc.data() as Transaction;
             const originalAmount = originalTransaction.amount;
             const originalType = originalTransaction.type;
+            
+            const newAmount = transactionUpdate.amount;
 
-            // Apply the update to the transaction document
-            firestoreTransaction.update(docRef, transactionUpdate);
-
-            // If the amount is part of the update, adjust the balance
-            if (transactionUpdate.amount !== undefined && transactionUpdate.amount !== originalAmount) {
-                // Calculate balance adjustment
+            // If amount changes, we need to adjust the balance
+            if (newAmount !== undefined && newAmount !== originalAmount) {
                 const originalValue = originalType === 'receita' ? originalAmount : -originalAmount;
-                const newValue = originalType === 'receita' ? transactionUpdate.amount : -transactionUpdate.amount;
-                const adjustment = newValue - originalValue;
+                const updatedValue = originalType === 'receita' ? newAmount : -newAmount;
+                const adjustment = updatedValue - originalValue;
 
-                // Update the bank account balance
                 const accountRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, accountId);
                 const accountDoc = await firestoreTransaction.get(accountRef);
-                if (!accountDoc.exists()) {
-                    throw "Account does not exist!";
-                }
+                if (!accountDoc.exists()) throw "Account does not exist!";
+                
                 const newBalance = (accountDoc.data().saldo || 0) + adjustment;
                 firestoreTransaction.update(accountRef, { saldo: newBalance });
             }
+
+            // Apply the update to the transaction document itself
+            firestoreTransaction.update(docRef, transactionUpdate);
+
         });
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
@@ -135,35 +135,43 @@ export async function deleteTransactionsBySource(firestore: Firestore, sourceId:
   
     try {
       const querySnapshot = await getDocs(q);
-      const balanceUpdates: Record<string, number> = {};
-  
-      querySnapshot.forEach((docSnapshot) => {
-        const transaction = docSnapshot.data() as Transaction;
-        batch.delete(docSnapshot.ref);
-  
-        const amountToRevert = transaction.type === 'receita' ? -transaction.amount : transaction.amount;
-        
-        if (balanceUpdates[transaction.accountId]) {
-          balanceUpdates[transaction.accountId] += amountToRevert;
-        } else {
-          balanceUpdates[transaction.accountId] = amountToRevert;
-        }
+      
+      // Use a transaction to ensure atomicity for balance updates
+      await runTransaction(firestore, async (transaction) => {
+          const balanceUpdates: Record<string, number> = {};
+
+          for (const docSnapshot of querySnapshot.docs) {
+              const transactionData = docSnapshot.data() as Transaction;
+              const accountId = transactionData.accountId;
+
+              // Defer deletion to the transaction batch
+              batch.delete(docSnapshot.ref);
+
+              const amountToRevert = transactionData.type === 'receita' ? -transactionData.amount : transactionData.amount;
+              
+              if (balanceUpdates[accountId]) {
+                  balanceUpdates[accountId] += amountToRevert;
+              } else {
+                  balanceUpdates[accountId] = amountToRevert;
+              }
+          }
+
+          for (const accountId in balanceUpdates) {
+              const accountRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, accountId);
+              const accountDoc = await transaction.get(accountRef);
+              if (accountDoc.exists()) {
+                  const currentBalance = accountDoc.data().saldo || 0;
+                  const newBalance = currentBalance + balanceUpdates[accountId];
+                  transaction.update(accountRef, { saldo: newBalance });
+              }
+          }
       });
-  
-      // Commit all deletions
+      
+      // Commit the batched deletions after the transaction succeeds
       await batch.commit();
-  
-      // After deletions, update balances in separate transactions for atomicity
-      for (const accountId in balanceUpdates) {
-        if (Object.prototype.hasOwnProperty.call(balanceUpdates, accountId)) {
-            const amount = balanceUpdates[accountId];
-            await updateBalance(firestore, accountId, amount);
-        }
-      }
   
     } catch (error) {
       console.error("Error reverting transactions by source:", error);
-      // In a real app, you would handle this more gracefully.
       const permissionError = new FirestorePermissionError({
           path: `transactions (sourceId: ${sourceId})`,
           operation: 'delete',

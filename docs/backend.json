@@ -61,6 +61,120 @@
         "loanStatus"
       ]
     },
+    "Loan": {
+      "title": "Loan",
+      "description": "Represents a loan provided to a customer.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the loan."
+        },
+        "loanCode": {
+          "type": "string",
+          "description": "A user-friendly code for the loan (e.g., CS-001)."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "The ID of the customer this loan belongs to."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The principal amount of the loan."
+        },
+        "interestRate": {
+          "type": "number",
+          "description": "The monthly interest rate (as a decimal, e.g., 0.05 for 5%)."
+        },
+        "term": {
+          "type": "number",
+          "description": "The loan term in months."
+        },
+        "lateFeeRate": {
+          "type": "number",
+          "description": "The daily late fee rate (as a decimal)."
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The start date of the loan."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Em dia",
+            "Atrasado",
+            "Pago"
+          ],
+          "description": "The current status of the loan."
+        },
+        "installments": {
+          "type": "array",
+          "description": "An array of all installments for the loan.",
+          "items": {
+            "$ref": "#/entities/Installment"
+          }
+        }
+      },
+      "required": [
+        "loanCode",
+        "customerId",
+        "amount",
+        "interestRate",
+        "term",
+        "lateFeeRate",
+        "startDate",
+        "status",
+        "installments"
+      ]
+    },
+    "Installment": {
+      "title": "Installment",
+      "description": "Represents a single installment of a loan.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the installment."
+        },
+        "loanId": {
+          "type": "string",
+          "description": "The ID of the loan this installment belongs to."
+        },
+        "installmentNumber": {
+          "type": "number",
+          "description": "The number of the installment in the sequence (e.g., 1, 2, 3...)."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount due for this installment."
+        },
+        "paidAmount": {
+          "type": "number",
+          "description": "The total amount paid for this installment."
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The due date for the installment."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Paga",
+            "Pendente"
+          ],
+          "description": "The payment status of the installment."
+        }
+      },
+      "required": [
+        "loanId",
+        "installmentNumber",
+        "amount",
+        "dueDate",
+        "status"
+      ]
+    },
     "BankAccount": {
       "title": "BankAccount",
       "description": "Represents a bank account.",
@@ -182,6 +296,12 @@
         "$ref": "#/entities/Customer"
       },
       "description": "Stores customer profile information."
+    },
+    "/loans/{loanId}": {
+      "schema": {
+        "$ref": "#/entities/Loan"
+      },
+      "description": "Stores all loan information, including installments."
     },
     "/bankAccounts/{accountId}": {
       "schema": {

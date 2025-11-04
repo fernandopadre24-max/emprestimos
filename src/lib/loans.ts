@@ -11,6 +11,7 @@ import {
   query,
   where,
   getDocs,
+  getCountFromServer,
 } from 'firebase/firestore';
 import type { Loan } from './types';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -23,33 +24,36 @@ const CUSTOMERS_COLLECTION = 'customers';
 // Function to generate a unique loan code
 async function generateLoanCode(firestore: Firestore): Promise<string> {
     const loansCollection = collection(firestore, LOANS_COLLECTION);
-    const snapshot = await getDocs(loansCollection);
-    const count = snapshot.size;
+    const snapshot = await getCountFromServer(loansCollection);
+    const count = snapshot.data().count;
     const nextId = (count + 1).toString().padStart(3, '0');
     return `CS-${nextId}`;
 }
 
 export async function addLoan(firestore: Firestore, loanData: Omit<Loan, 'id' | 'installments' | 'loanCode'>) {
+  const coll = collection(firestore, LOANS_COLLECTION);
   try {
     const loanCode = await generateLoanCode(firestore);
-    const newLoanRef = doc(collection(firestore, LOANS_COLLECTION));
-    const installments = generateInstallments({ ...loanData, id: newLoanRef.id });
+    const newLoanRef = doc(coll);
+    const loanWithId = { ...loanData, id: newLoanRef.id, loanCode };
+    const installments = generateInstallments(loanWithId);
 
     const newLoan: Loan = {
-      ...loanData,
-      id: newLoanRef.id,
-      loanCode,
+      ...loanWithId,
       installments,
     };
-
-    await addDoc(collection(firestore, LOANS_COLLECTION), newLoan);
     
-    // Update customer status
+    // Using setDoc with the generated ref ensures the ID is what we expect
+    await runTransaction(firestore, async (transaction) => {
+        transaction.set(newLoanRef, newLoan);
+    });
+
+    // Update customer status after successful loan creation
     await updateCustomerLoanStatus(firestore, loanData.customerId);
 
   } catch (serverError) {
     const permissionError = new FirestorePermissionError({
-      path: LOANS_COLLECTION,
+      path: coll.path,
       operation: 'create',
       requestResourceData: loanData,
     });
@@ -75,7 +79,7 @@ export function updateLoan(
                 throw "Loan does not exist!";
             }
             const existingLoan = loanDoc.data() as Loan;
-            const updatedLoanDetails = { ...existingLoan, ...loanData };
+            const updatedLoanDetails = { ...existingLoan, ...loanData, id: existingLoan.id, loanCode: existingLoan.loanCode };
             const newInstallments = generateInstallments(updatedLoanDetails);
             dataToUpdate.installments = newInstallments;
             transaction.update(docRef, dataToUpdate);
@@ -114,30 +118,35 @@ export async function updateCustomerLoanStatus(firestore: Firestore, customerId:
     const loansCollection = collection(firestore, LOANS_COLLECTION);
     const customerLoansQuery = query(loansCollection, where("customerId", "==", customerId));
     
-    const querySnapshot = await getDocs(customerLoansQuery);
-    const customerLoans = querySnapshot.docs.map(doc => doc.data() as Loan);
+    try {
+        const querySnapshot = await getDocs(customerLoansQuery);
+        const customerLoans = querySnapshot.docs.map(doc => doc.data() as Loan);
 
-    let newStatus: 'Ativo' | 'Pago' | 'Inadimplente' = 'Pago';
+        let newStatus: 'Ativo' | 'Pago' | 'Inadimplente' = 'Pago';
 
-    if (customerLoans.length > 0) {
-        const hasActiveLoans = customerLoans.some(loan => loan.status !== 'Pago');
-        const hasOverdueLoans = customerLoans.some(loan => loan.status === 'Atrasado');
+        if (customerLoans.length > 0) {
+            const hasOverdueLoans = customerLoans.some(loan => loan.status === 'Atrasado');
+            const hasActiveLoans = customerLoans.some(loan => loan.status === 'Em dia');
 
-        if (hasOverdueLoans) {
-            newStatus = 'Inadimplente';
-        } else if (hasActiveLoans) {
-            newStatus = 'Ativo';
+            if (hasOverdueLoans) {
+                newStatus = 'Inadimplente';
+            } else if (hasActiveLoans) {
+                newStatus = 'Ativo';
+            } else {
+                newStatus = 'Pago';
+            }
         } else {
-            newStatus = 'Pago';
+             // If a customer has no loans, they are considered 'Active' but without debt.
+             // Or we can use a different status. For now, 'Ativo' seems fine.
+             // If we set to 'Pago', it might be confusing.
+             // Let's reset to 'Ativo' as they are an active customer without pending loans.
+            newStatus = 'Ativo'; 
         }
-    } else {
-        // If no loans, could be considered 'Pago' or a new status like 'Sem empréstimos'
-        // For now, we'll stick to the existing statuses. Let's assume no loans means they are clear.
-        newStatus = 'Pago'; 
+
+        const customerRef = doc(firestore, CUSTOMERS_COLLECTION, customerId);
+        await updateDoc(customerRef, { loanStatus: newStatus });
+    } catch(e) {
+        console.error("Could not update customer loan status", e);
+        // Not throwing permission error here as it's a background process
     }
-
-    const customerRef = doc(firestore, CUSTOMERS_COLLECTION, customerId);
-    await updateDoc(customerRef, { loanStatus: newStatus });
 }
-
-    
