@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { format, parseISO, differenceInDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import type { Loan, Customer, Installment, BankAccount, Transaction } from "@/lib/types"
+import type { Loan, Customer, Installment, BankAccount } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, FilePenLine, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch"
 import { useCollection, useFirestore } from "@/firebase"
 import { addTransaction, deleteTransactionsBySource } from "@/lib/transactions"
 import { collection, doc, updateDoc, writeBatch } from "firebase/firestore"
-import { deleteLoan, updateLoan, generateInstallments, updateCustomerLoanStatus } from "@/lib/loans"
+import { deleteLoan, updateLoan, updateCustomerLoanStatus } from "@/lib/loans"
 import { Skeleton } from "@/components/ui/skeleton"
 
 

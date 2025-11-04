@@ -39,19 +39,18 @@ const prompt = ai.definePrompt({
   name: 'generateFinancialReportPrompt',
   input: {schema: GenerateFinancialReportInputSchema},
   output: {schema: GenerateFinancialReportOutputSchema},
-  prompt: `Você é um especialista financeiro sênior, especializado em análise de portfólios de empréstimos. Prepare um relatório financeiro baseado nos seguintes critérios:
+  prompt: `Você é um especialista financeiro sênior, especializado em análise de portfólios de empréstimos. Prepare um relatório financeiro em português do Brasil baseado nos seguintes critérios:
 
   Data de início: {{{startDate}}}
   Data de término: {{{endDate}}}
   Tipo de relatório: {{{reportType}}}
 
-  Inclua os seguintes dados e métricas no relatório:
+  O relatório deve incluir:
+  - Distribuição de Empréstimos: Um resumo do valor total e da quantidade de empréstimos distribuídos no período.
+  - Rastreamento de Pagamentos: Um resumo dos pagamentos recebidos, incluindo juros e principal.
+  - Métricas de Lucratividade: Uma análise da lucratividade geral, considerando juros recebidos versus perdas.
 
-  - Distribuição de empréstimos: um resumo da quantidade total de empréstimos distribuídos durante o período especificado.
-  - Rastreamento de pagamentos: um resumo dos pagamentos recebidos durante o período especificado.
-  - Métricas de lucratividade: um cálculo da lucratividade geral do portfólio de empréstimos durante o período especificado.
-
-  Formate o relatório de forma clara e concisa, usando títulos e marcadores para facilitar a leitura. Use português do Brasil para o relatório.
+  Formate o relatório de forma clara e concisa, usando títulos e marcadores para facilitar a leitura.
   `,
 });
 
