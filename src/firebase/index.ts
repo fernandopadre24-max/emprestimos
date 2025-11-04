@@ -32,6 +32,17 @@ function initializeFirebase(options: FirebaseOptions = firebaseConfig): {
   const auth = getAuth(app);
   const firestore = getFirestore(app);
 
+  // Connect to emulators in development
+  if (process.env.NODE_ENV === "development") {
+    // Point auth to the local emulator
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", {
+      disableWarnings: true,
+    });
+    // Point firestore to the local emulator
+    connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
+  }
+
+
   return { app, auth, firestore };
 }
 

@@ -14,6 +14,7 @@ import { useUser } from '@/firebase/auth/use-user';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FirebaseProvider, initializeFirebase } from '@/firebase';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
@@ -90,6 +91,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const firebaseServices = initializeFirebase();
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
@@ -107,10 +109,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseClientProvider>
+          <FirebaseProvider value={firebaseServices}>
             <Toaster />
             <AppContent>{children}</AppContent>
-          </FirebaseClientProvider>
+          </FirebaseProvider>
         </ThemeProvider>
       </body>
     </html>
