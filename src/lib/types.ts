@@ -49,19 +49,6 @@ export interface ChartData {
   emprestimos: number;
 }
 
-export interface BankData {
-  totalBalance: number;
-  totalWithdrawn: number;
-  availableForLoans: number;
-}
-
-export interface BankSummary {
-    receitas: number;
-    despesas: number;
-    balanco: number;
-    saldoContas: number;
-}
-
 export interface BankAccount {
     id: string;
     banco: string;

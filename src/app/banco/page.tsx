@@ -248,12 +248,8 @@ export default function BancoPage() {
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
 
-  const bankSummary = useMemo(() => {
-    const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
-    // Note: Revenue/Expense summaries are removed for performance.
-    // They would require fetching all transactions. 
-    // In a real app, this would be done with aggregated data.
-    return { saldoContas };
+  const totalBalance = useMemo(() => {
+    return (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
   }, [bankAccounts]);
 
 
@@ -352,7 +348,7 @@ export default function BancoPage() {
             <CardContent>
               {isLoading ? <Skeleton className="h-8 w-3/4" /> :
               <div className="text-2xl font-bold font-headline text-primary">
-                {bankSummary.saldoContas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                {totalBalance.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
               }
               <p className="text-xs text-muted-foreground">Soma dos saldos bancários</p>
@@ -463,5 +459,3 @@ export default function BancoPage() {
     </>
   )
 }
-
-    

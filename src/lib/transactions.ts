@@ -12,6 +12,7 @@ import {
   where,
   getDocs,
   getDoc,
+  collectionGroup,
 } from 'firebase/firestore';
 import type { Transaction } from './types';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -170,5 +171,3 @@ export async function deleteTransactionsBySource(firestore: Firestore, sourceId:
       errorEmitter.emit('permission-error', permissionError);
     }
 }
-
-    

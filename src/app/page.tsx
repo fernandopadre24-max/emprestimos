@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useMemo } from "react"
 import {
   Card,
   CardContent,
@@ -18,10 +18,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
 } from "@/components/ui/chart"
 import {
   Table,
@@ -36,11 +32,9 @@ import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO, getMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign, TrendingUp } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CircleDollarSign, CreditCard, TrendingUp } from "lucide-react"
 import { useCollection, useFirestore } from "@/firebase"
-import { collection, query, collectionGroup, orderBy, limit } from "firebase/firestore"
+import { collection, query, orderBy, limit } from "firebase/firestore"
 import { Skeleton } from "@/components/ui/skeleton"
 
 
@@ -49,13 +43,9 @@ const chartConfig = {
     label: "Empréstimos",
     color: "hsl(var(--chart-1))",
   },
-  receitas: {
-    label: "Receitas",
+  juros: {
+    label: "Juros Recebidos",
     color: "hsl(var(--chart-2))",
-  },
-  despesas: {
-    label: "Despesas",
-    color: "hsl(var(--chart-5))",
   },
 } satisfies ChartConfig
 
@@ -64,53 +54,42 @@ export default function Dashboard() {
 
   const loansQuery = useMemo(() => query(collection(firestore, 'loans'), orderBy('startDate', 'desc')), [firestore]);
   const customersQuery = useMemo(() => collection(firestore, 'customers'), [firestore]);
-  // PERFORMANCE: Fetching ALL transactions is slow. We should get this data from an aggregated source if possible.
-  // For the chart, we will fetch them, but this is a known performance bottleneck for large datasets.
-  const transactionsQuery = useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]);
   const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
 
   const { data: allLoans, isLoading: isLoadingLoans } = useCollection<Loan>(loansQuery);
   const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersQuery);
-  const { data: transactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(transactionsQuery);
   const { data: bankAccounts, isLoading: isLoadingBankAccounts } = useCollection<BankAccount>(bankAccountsQuery);
-  
-  const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
   
   const recentLoans = useMemo(() => (allLoans || []).slice(0, 5), [allLoans]);
 
   const balanceChartData = useMemo(() => {
-    const monthlyData: { month: string; emprestimos: number; receitas: number; despesas: number }[] = Array.from({ length: 12 }, (_, i) => ({
+    const monthlyData: { month: string; emprestimos: number; juros: number; }[] = Array.from({ length: 12 }, (_, i) => ({
       month: format(new Date(new Date().getFullYear(), i, 1), "MMM", { locale: ptBR }),
       emprestimos: 0,
-      receitas: 0,
-      despesas: 0,
+      juros: 0,
     }));
   
-    // This is slow for many transactions. In a real-world app, this would be pre-aggregated.
-    (transactions || []).forEach(transaction => {
-      try {
-        const monthIndex = getMonth(parseISO(transaction.date));
-        if (transaction.type === 'receita') {
-          monthlyData[monthIndex].receitas += transaction.amount;
-        } else {
-          monthlyData[monthIndex].despesas += transaction.amount;
-        }
-      } catch (e) {
-        console.warn("Invalid transaction date", transaction);
-      }
-    });
-
     (allLoans || []).forEach(loan => {
         try {
             const monthIndex = getMonth(parseISO(loan.startDate));
             monthlyData[monthIndex].emprestimos += loan.amount;
+
+            loan.installments.forEach(inst => {
+                if (inst.status === 'Paga' && inst.paidAmount) {
+                    const interestPortion = inst.paidAmount - (inst.originalAmount / (1 + loan.interestRate));
+                    if (interestPortion > 0) {
+                        monthlyData[monthIndex].juros += interestPortion;
+                    }
+                }
+            })
+
         } catch (e) {
             console.warn("Invalid loan date", loan);
         }
     });
   
     return monthlyData;
-  }, [transactions, allLoans]);
+  }, [allLoans]);
 
 
   const totalValue = useMemo(() => (allLoans || []).reduce((acc, loan) => acc + loan.amount, 0), [allLoans])
@@ -119,16 +98,16 @@ export default function Dashboard() {
   
   const profitability = useMemo(() => (allLoans || []).reduce((acc, loan) => {
     if (!loan.installments) return acc;
-    // Simplified profitability: total paid amount minus original loan amount
     const totalPaid = loan.installments.reduce((sum, inst) => sum + (inst.paidAmount || 0), 0);
     if(totalPaid > 0) {
-      return acc + (totalPaid - loan.amount);
+        const interest = totalPaid - loan.amount;
+        return acc + (interest > 0 ? interest : 0);
     }
     return acc;
   }, 0), [allLoans]);
     
   
-  const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingTransactions || isLoadingBankAccounts;
+  const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingBankAccounts;
 
 
   return (
@@ -273,54 +252,22 @@ export default function Dashboard() {
             <CardHeader>
                 <div className="flex justify-between items-center">
                     <div>
-                        <CardTitle className="font-headline">Balanço Geral</CardTitle>
-                        <CardDescription>Balanço mensal do ano corrente</CardDescription>
+                        <CardTitle className="font-headline">Balanço Mensal</CardTitle>
+                        <CardDescription>Empréstimos concedidos vs. Juros recebidos</CardDescription>
                     </div>
-                    <Tabs defaultValue="bar" className="w-auto" onValueChange={(value) => setChartType(value as "bar" | "line" | "area")}>
-                        <TabsList>
-                            <TabsTrigger value="bar">Barras</TabsTrigger>
-                            <TabsTrigger value="line">Linhas</TabsTrigger>
-                            <TabsTrigger value="area">Área</TabsTrigger>
-                        </TabsList>
-                    </Tabs>
                 </div>
             </CardHeader>
             <CardContent className="pl-2">
-              {isLoadingTransactions || isLoadingLoans ? <Skeleton className="w-full h-[300px]" /> :
+              {isLoadingLoans ? <Skeleton className="w-full h-[300px]" /> :
                 <ChartContainer config={chartConfig} className="w-full h-[300px]">
-                    {chartType === 'bar' && 
-                        <BarChart data={balanceChartData}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                            <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
-                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                            <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
-                            <Bar dataKey="receitas" fill="var(--color-receitas)" radius={4} />
-                            <Bar dataKey="despesas" fill="var(--color-despesas)" radius={4} />
-                        </BarChart>
-                    }
-                    {chartType === 'line' &&
-                        <LineChart data={balanceChartData}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                            <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
-                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                            <Line dataKey="emprestimos" stroke="var(--color-emprestimos)" />
-                            <Line dataKey="receitas" stroke="var(--color-receitas)" />
-                            <Line dataKey="despesas" stroke="var(--color-despesas)" />
-                        </LineChart>
-                    }
-                    {chartType === 'area' &&
-                        <AreaChart data={balanceChartData}>
-                            <CartesianGrid vertical={false} />
-                            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                            <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
-                            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
-                            <Area dataKey="emprestimos" fill="var(--color-emprestimos)" stroke="var(--color-emprestimos)" />
-                            <Area dataKey="receitas" fill="var(--color-receitas)" stroke="var(--color-receitas)" />
-                            <Area dataKey="despesas" fill="var(--color-despesas)" stroke="var(--color-despesas)" />
-                        </AreaChart>
-                    }
+                    <BarChart data={balanceChartData}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
+                        <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
+                        <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
+                        <Bar dataKey="juros" fill="var(--color-juros)" radius={4} />
+                    </BarChart>
                 </ChartContainer>
                 }
             </CardContent>
@@ -366,5 +313,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
-    
