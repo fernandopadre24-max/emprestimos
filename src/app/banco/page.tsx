@@ -43,7 +43,7 @@ import { NewTransactionDialog } from "@/components/banco/new-transaction-dialog"
 import { EditTransactionDialog } from "@/components/banco/edit-transaction-dialog"
 import { ManageCategoriesDialog } from "@/components/banco/manage-categories-dialog"
 import { Badge } from "@/components/ui/badge"
-import { format, parseISO, isWithinInterval } from "date-fns"
+import { format, parseISO, isWithinInterval, getMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
@@ -52,7 +52,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
 
 import { useCollection, useFirestore } from "@/firebase"
-import { collection, query, collectionGroup, getDocs } from "firebase/firestore"
+import { collection, query, collectionGroup } from "firebase/firestore"
 import { addBankAccount, updateBankAccount, deleteBankAccount } from "@/lib/bank"
 import { addTransaction, updateTransaction, deleteTransaction } from "@/lib/transactions"
 import { addCategory, deleteCategory } from "@/lib/categories"
@@ -244,42 +244,31 @@ export default function BancoPage() {
   const firestore = useFirestore();
   const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
   const categoriesQuery = useMemo(() => collection(firestore, 'categories'), [firestore]);
+  const transactionsQuery = useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]);
 
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
-  
-  // State to hold transactions for summary cards
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
-
-  useEffect(() => {
-    async function fetchAllTransactions() {
-      if (!firestore) return;
-      setIsLoadingTransactions(true);
-      const transGroup = collectionGroup(firestore, 'transactions');
-      const querySnapshot = await getDocs(transGroup);
-      const transactionsData = querySnapshot.docs.map(doc => doc.data() as Transaction);
-      setAllTransactions(transactionsData);
-      setIsLoadingTransactions(false);
-    }
-    fetchAllTransactions();
-  }, [firestore]);
-
+  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(transactionsQuery);
 
   const bankSummary = useMemo(() => {
     const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
     
-    const receitas = (allTransactions || [])
-      .filter(t => t.type === 'receita')
-      .reduce((acc, t) => acc + t.amount, 0);
+    const monthlyData = Array.from({ length: 12 }, () => ({ receitas: 0, despesas: 0 }));
 
-    const despesas = (allTransactions || [])
-      .filter(t => t.type === 'despesa')
-      .reduce((acc, t) => acc + t.amount, 0);
+    (allTransactions || []).forEach(t => {
+        const month = getMonth(parseISO(t.date));
+        if (t.type === 'receita') {
+            monthlyData[month].receitas += t.amount;
+        } else {
+            monthlyData[month].despesas += t.amount;
+        }
+    });
+
+    const totalReceitas = monthlyData.reduce((acc, data) => acc + data.receitas, 0);
+    const totalDespesas = monthlyData.reduce((acc, data) => acc + data.despesas, 0);
+    const balanco = totalReceitas - totalDespesas;
     
-    const balanco = receitas - despesas;
-    
-    return { saldoContas, receitas, despesas, balanco };
+    return { saldoContas, receitas: totalReceitas, despesas: totalDespesas, balanco };
   }, [bankAccounts, allTransactions]);
 
 

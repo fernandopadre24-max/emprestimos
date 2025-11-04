@@ -19,9 +19,20 @@ import { useState } from "react"
 import { CalculatorComponent } from "./calculator"
 import { ptBR } from "date-fns/locale"
 import { ThemeToggle } from "./theme-toggle"
+import { usePathname } from 'next/navigation'
 
 export default function Header() {
   const [date, setDate] = useState<Date | undefined>(new Date())
+  const pathname = usePathname()
+  
+  const getBreadcrumb = () => {
+    const parts = pathname.split('/').filter(part => part)
+    const pageTitle = parts.length > 0 ? parts[parts.length - 1] : 'Dashboard'
+    // Capitalize first letter
+    return pageTitle.charAt(0).toUpperCase() + pageTitle.slice(1);
+  }
+
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
       <SidebarTrigger className="sm:hidden" />
@@ -34,7 +45,7 @@ export default function Header() {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Dashboard</BreadcrumbPage>
+            <BreadcrumbPage>{getBreadcrumb()}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>

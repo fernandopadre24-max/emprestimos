@@ -118,15 +118,16 @@ export default function Dashboard() {
     return acc + loanProfit;
   }, 0), [allLoans]);
   
-  const totalReceitas = useMemo(() => (transactions || [])
-    .filter(t => t.type === 'receita')
-    .reduce((acc, t) => acc + t.amount, 0), [transactions]);
-
-  const totalDespesas = useMemo(() => (transactions || [])
-    .filter(t => t.type === 'despesa')
-    .reduce((acc, t) => acc + t.amount, 0), [transactions]);
+  const { totalReceitas, totalDespesas, balancoGeral } = useMemo(() => {
+    const receitas = balanceChartData.reduce((acc, data) => acc + data.receitas, 0);
+    const despesas = balanceChartData.reduce((acc, data) => acc + data.despesas, 0);
+    return {
+      totalReceitas: receitas,
+      totalDespesas: despesas,
+      balancoGeral: receitas - despesas
+    };
+  }, [balanceChartData]);
     
-  const balancoGeral = totalReceitas - totalDespesas;
   
   const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingTransactions || isLoadingBankAccounts;
 
