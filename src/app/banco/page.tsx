@@ -43,7 +43,7 @@ import { NewTransactionDialog } from "@/components/banco/new-transaction-dialog"
 import { EditTransactionDialog } from "@/components/banco/edit-transaction-dialog"
 import { ManageCategoriesDialog } from "@/components/banco/manage-categories-dialog"
 import { Badge } from "@/components/ui/badge"
-import { format, parseISO, isWithinInterval, getMonth } from "date-fns"
+import { format, parseISO, isWithinInterval } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
@@ -52,7 +52,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import type { DateRange } from "react-day-picker"
 
 import { useCollection, useFirestore } from "@/firebase"
-import { collection, query, collectionGroup } from "firebase/firestore"
+import { collection, query } from "firebase/firestore"
 import { addBankAccount, updateBankAccount, deleteBankAccount } from "@/lib/bank"
 import { addTransaction, updateTransaction, deleteTransaction } from "@/lib/transactions"
 import { addCategory, deleteCategory } from "@/lib/categories"
@@ -131,7 +131,7 @@ function AccountTransactions({ accountId, categories }: { accountId: string, cat
 
   const handleDeleteTransaction = () => {
     if (!selectedTransaction) return;
-    deleteTransaction(firestore, accountId, selectedTransaction.id);
+    deleteTransaction(firestore, accountId, selectedTransaction.id, selectedTransaction.amount, selectedTransaction.type);
     setDeleteTransactionAlertOpen(false);
   };
 
@@ -227,7 +227,7 @@ function AccountTransactions({ accountId, categories }: { accountId: string, cat
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isso irá excluir permanentemente a transação. O saldo da conta não será ajustado automaticamente.
+              Esta ação não pode ser desfeita. Isso irá excluir permanentemente a transação e o saldo da conta será ajustado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -248,34 +248,13 @@ export default function BancoPage() {
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
 
-  // Note: We are no longer fetching all transactions here to improve performance.
-  // The summary data is now derived from the bank accounts' saldo, which is updated by transactions.
-  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]));
-
-
   const bankSummary = useMemo(() => {
     const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
-    
-    // This calculation is now an estimation based on recent transactions for the chart.
-    // For a more accurate "period balance", a more targeted query or aggregation would be needed.
-    // We will simulate it based on all transactions for now, but acknowledge this is slow.
-    const monthlyData = Array.from({ length: 12 }, () => ({ receitas: 0, despesas: 0 }));
-
-    (allTransactions || []).forEach(t => {
-        const month = getMonth(parseISO(t.date));
-        if (t.type === 'receita') {
-            monthlyData[month].receitas += t.amount;
-        } else {
-            monthlyData[month].despesas += t.amount;
-        }
-    });
-
-    const totalReceitas = monthlyData.reduce((acc, data) => acc + data.receitas, 0);
-    const totalDespesas = monthlyData.reduce((acc, data) => acc + data.despesas, 0);
-    const balanco = totalReceitas - totalDespesas;
-    
-    return { saldoContas, receitas: totalReceitas, despesas: totalDespesas, balanco };
-  }, [bankAccounts, allTransactions]);
+    // Note: Revenue/Expense summaries are removed for performance.
+    // They would require fetching all transactions. 
+    // In a real app, this would be done with aggregated data.
+    return { saldoContas };
+  }, [bankAccounts]);
 
 
   const [isAddAccountOpen, setAddAccountOpen] = useState(false);
@@ -315,6 +294,8 @@ export default function BancoPage() {
   }
   
   const handleDeleteAccount = (accountId: string) => {
+    // Note: This does not delete sub-collections of transactions.
+    // A cloud function would be needed for that in a production app.
     deleteBankAccount(firestore, accountId);
   }
 
@@ -338,7 +319,7 @@ export default function BancoPage() {
     );
   }
   
-  const isLoading = isLoadingAccounts || isLoadingCategories || isLoadingTransactions;
+  const isLoading = isLoadingAccounts || isLoadingCategories;
   
   return (
     <>
@@ -361,70 +342,20 @@ export default function BancoPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="bg-green-100/50 border-green-200">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-green-800">
-                Receitas
+              <CardTitle className="text-sm font-medium">
+                Saldo Total em Contas
               </CardTitle>
-              <ArrowUpCircle className="h-5 w-5 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> : 
-              <div className="text-2xl font-bold font-headline text-green-800">
-                {bankSummary.receitas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </div>
-              }
-              <p className="text-xs text-green-700">
-                Total de entradas do período
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="bg-red-100/50 border-red-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-800">
-                Despesas
-              </CardTitle>
-              <ArrowDownCircle className="h-5 w-5 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> : 
-              <div className="text-2xl font-bold font-headline text-red-800">
-                {bankSummary.despesas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </div>
-              }
-              <p className="text-xs text-red-700">Total de saídas do período</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-blue-100/50 border-blue-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-800">
-                Balanço do Período
-              </CardTitle>
-              <CircleDollarSign className="h-5 w-5 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> : 
-              <div className="text-2xl font-bold font-headline text-blue-800">
-                {bankSummary.balanco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              </div>
-              }
-              <p className="text-xs text-blue-700">Receitas - Despesas</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-purple-100/50 border-purple-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-purple-800">
-                Saldo em Contas
-              </CardTitle>
-              <CreditCard className="h-5 w-5 text-purple-600" />
+              <CreditCard className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-              <div className="text-2xl font-bold font-headline text-purple-800">
+              <div className="text-2xl font-bold font-headline text-primary">
                 {bankSummary.saldoContas.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </div>
               }
-              <p className="text-xs text-purple-700">Soma dos saldos bancários</p>
+              <p className="text-xs text-muted-foreground">Soma dos saldos bancários</p>
             </CardContent>
           </Card>
         </div>
@@ -532,3 +463,5 @@ export default function BancoPage() {
     </>
   )
 }
+
+    

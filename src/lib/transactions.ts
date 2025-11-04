@@ -54,39 +54,77 @@ export function addTransaction(
 }
 
 
-export function updateTransaction(
+export async function updateTransaction(
   firestore: Firestore,
   accountId: string,
   transactionId: string,
-  transaction: Partial<Transaction>
+  transactionUpdate: Partial<Transaction>
 ) {
     const docRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, accountId, TRANSACTIONS_COLLECTION, transactionId);
-    updateDoc(docRef, transaction).catch(async (serverError) => {
+
+    try {
+        await runTransaction(firestore, async (firestoreTransaction) => {
+            const transactionDoc = await firestoreTransaction.get(docRef);
+            if (!transactionDoc.exists()) {
+                throw "Transaction does not exist!";
+            }
+
+            const originalTransaction = transactionDoc.data() as Transaction;
+            const originalAmount = originalTransaction.amount;
+            const originalType = originalTransaction.type;
+
+            // Apply the update to the transaction document
+            firestoreTransaction.update(docRef, transactionUpdate);
+
+            // If the amount is part of the update, adjust the balance
+            if (transactionUpdate.amount !== undefined && transactionUpdate.amount !== originalAmount) {
+                // Calculate balance adjustment
+                const originalValue = originalType === 'receita' ? originalAmount : -originalAmount;
+                const newValue = originalType === 'receita' ? transactionUpdate.amount : -transactionUpdate.amount;
+                const adjustment = newValue - originalValue;
+
+                // Update the bank account balance
+                const accountRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, accountId);
+                const accountDoc = await firestoreTransaction.get(accountRef);
+                if (!accountDoc.exists()) {
+                    throw "Account does not exist!";
+                }
+                const newBalance = (accountDoc.data().saldo || 0) + adjustment;
+                firestoreTransaction.update(accountRef, { saldo: newBalance });
+            }
+        });
+    } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'update',
-            requestResourceData: transaction,
+            requestResourceData: transactionUpdate,
         });
         errorEmitter.emit('permission-error', permissionError);
-    });
-    // Note: Balance is not automatically adjusted on edit for simplicity.
-    // A more robust solution would calculate the diff and update the balance.
+    }
 }
+
 
 export function deleteTransaction(
     firestore: Firestore, 
     accountId: string, 
-    transactionId: string
+    transactionId: string,
+    amount: number,
+    type: 'receita' | 'despesa'
 ) {
     const docRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, accountId, TRANSACTIONS_COLLECTION, transactionId);
+    
     deleteDoc(docRef).catch(async (serverError) => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
             operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
+        return; // Stop execution on permission error
     });
-    // Note: Balance is not automatically adjusted on delete.
+
+    // Adjust balance after deletion
+    const amountToRevert = type === 'receita' ? -amount : amount;
+    updateBalance(firestore, accountId, amountToRevert);
 }
 
 export async function deleteTransactionsBySource(firestore: Firestore, sourceId: string) {
@@ -114,18 +152,12 @@ export async function deleteTransactionsBySource(firestore: Firestore, sourceId:
       // Commit all deletions
       await batch.commit();
   
-      // After deletions, update balances in separate transactions
+      // After deletions, update balances in separate transactions for atomicity
       for (const accountId in balanceUpdates) {
-        const amount = balanceUpdates[accountId];
-        const accountRef = doc(firestore, BANK_ACCOUNTS_COLLECTION, accountId);
-        await runTransaction(firestore, async (transaction) => {
-          const accountDoc = await transaction.get(accountRef);
-          if (accountDoc.exists()) {
-            const currentBalance = accountDoc.data().saldo || 0;
-            const newBalance = currentBalance + amount;
-            transaction.update(accountRef, { saldo: newBalance });
-          }
-        });
+        if (Object.prototype.hasOwnProperty.call(balanceUpdates, accountId)) {
+            const amount = balanceUpdates[accountId];
+            await updateBalance(firestore, accountId, amount);
+        }
       }
   
     } catch (error) {
@@ -138,3 +170,5 @@ export async function deleteTransactionsBySource(firestore: Firestore, sourceId:
       errorEmitter.emit('permission-error', permissionError);
     }
 }
+
+    

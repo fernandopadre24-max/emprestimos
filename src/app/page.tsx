@@ -36,7 +36,7 @@ import type { Loan, Customer, Transaction, BankAccount } from "@/lib/types"
 import type { ChartConfig } from "@/components/ui/chart"
 import { format, parseISO, getMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign } from "lucide-react"
+import { ArrowDownCircle, ArrowUpCircle, CreditCard, CircleDollarSign, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useCollection, useFirestore } from "@/firebase"
@@ -64,6 +64,8 @@ export default function Dashboard() {
 
   const loansQuery = useMemo(() => query(collection(firestore, 'loans'), orderBy('startDate', 'desc')), [firestore]);
   const customersQuery = useMemo(() => collection(firestore, 'customers'), [firestore]);
+  // PERFORMANCE: Fetching ALL transactions is slow. We should get this data from an aggregated source if possible.
+  // For the chart, we will fetch them, but this is a known performance bottleneck for large datasets.
   const transactionsQuery = useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]);
   const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
 
@@ -84,18 +86,27 @@ export default function Dashboard() {
       despesas: 0,
     }));
   
+    // This is slow for many transactions. In a real-world app, this would be pre-aggregated.
     (transactions || []).forEach(transaction => {
-      const monthIndex = getMonth(parseISO(transaction.date));
-      if (transaction.type === 'receita') {
-        monthlyData[monthIndex].receitas += transaction.amount;
-      } else {
-        monthlyData[monthIndex].despesas += transaction.amount;
+      try {
+        const monthIndex = getMonth(parseISO(transaction.date));
+        if (transaction.type === 'receita') {
+          monthlyData[monthIndex].receitas += transaction.amount;
+        } else {
+          monthlyData[monthIndex].despesas += transaction.amount;
+        }
+      } catch (e) {
+        console.warn("Invalid transaction date", transaction);
       }
     });
 
     (allLoans || []).forEach(loan => {
-        const monthIndex = getMonth(parseISO(loan.startDate));
-        monthlyData[monthIndex].emprestimos += loan.amount;
+        try {
+            const monthIndex = getMonth(parseISO(loan.startDate));
+            monthlyData[monthIndex].emprestimos += loan.amount;
+        } catch (e) {
+            console.warn("Invalid loan date", loan);
+        }
     });
   
     return monthlyData;
@@ -104,29 +115,17 @@ export default function Dashboard() {
 
   const totalValue = useMemo(() => (allLoans || []).reduce((acc, loan) => acc + loan.amount, 0), [allLoans])
   const totalCustomers = useMemo(() => (customers || []).length, [customers]);
+  const totalBalance = useMemo(() => (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0), [bankAccounts]);
   
   const profitability = useMemo(() => (allLoans || []).reduce((acc, loan) => {
     if (!loan.installments) return acc;
-    const principalPerInstallment = loan.amount / loan.term;
-    const loanProfit = loan.installments.reduce((installmentAcc, installment) => {
-        if (installment.paidAmount > 0) {
-            const profitFromInstallment = installment.paidAmount - principalPerInstallment;
-            return installmentAcc + (profitFromInstallment > 0 ? profitFromInstallment : 0);
-        }
-        return installmentAcc;
-    }, 0);
-    return acc + loanProfit;
+    // Simplified profitability: total paid amount minus original loan amount
+    const totalPaid = loan.installments.reduce((sum, inst) => sum + (inst.paidAmount || 0), 0);
+    if(totalPaid > 0) {
+      return acc + (totalPaid - loan.amount);
+    }
+    return acc;
   }, 0), [allLoans]);
-  
-  const { totalReceitas, totalDespesas, balancoGeral } = useMemo(() => {
-    const receitas = balanceChartData.reduce((acc, data) => acc + data.receitas, 0);
-    const despesas = balanceChartData.reduce((acc, data) => acc + data.despesas, 0);
-    return {
-      totalReceitas: receitas,
-      totalDespesas: despesas,
-      balancoGeral: receitas - despesas
-    };
-  }, [balanceChartData]);
     
   
   const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingTransactions || isLoadingBankAccounts;
@@ -134,25 +133,13 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Valor Total Emprestado
             </CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              className="h-4 w-4 text-muted-foreground"
-            >
-              <line x1="12" x2="12" y1="2" y2="22" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
+            <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-3/4" /> :
@@ -196,24 +183,11 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Lucratividade (Juros)</CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4 text-muted-foreground"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-            <div className="text-2xl font-bold font-headline">
+            <div className="text-2xl font-bold font-headline text-green-600">
               {profitability.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             }
@@ -222,65 +196,22 @@ export default function Dashboard() {
             </p>
           </CardContent>
         </Card>
-        <Card className="bg-green-100/50 border-green-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-green-800">
-                Total Receitas
-              </CardTitle>
-              <ArrowUpCircle className="h-5 w-5 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-              <div className="text-2xl font-bold font-headline text-green-800">
-                {totalReceitas.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </div>
-              }
-              <p className="text-xs text-green-700">
-                Soma de todas as receitas
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="bg-red-100/50 border-red-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-800">
-                Total Despesas
-              </CardTitle>
-              <ArrowDownCircle className="h-5 w-5 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-              <div className="text-2xl font-bold font-headline text-red-800">
-                {totalDespesas.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </div>
-              }
-              <p className="text-xs text-red-700">Soma de todas as despesas</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-blue-100/50 border-blue-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-800">
-                Balanço Geral
-              </CardTitle>
-              <CircleDollarSign className="h-5 w-5 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> :
-              <div className="text-2xl font-bold font-headline text-blue-800">
-                {balancoGeral.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </div>
-              }
-              <p className="text-xs text-blue-700">Receitas - Despesas</p>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo Total em Contas</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> :
+            <div className="text-2xl font-bold font-headline">
+              {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
+            }
+            <p className="text-xs text-muted-foreground">
+              Soma dos saldos disponíveis.
+            </p>
+          </CardContent>
+        </Card>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
@@ -355,13 +286,13 @@ export default function Dashboard() {
                 </div>
             </CardHeader>
             <CardContent className="pl-2">
-              {isLoading ? <Skeleton className="w-full h-[300px]" /> :
+              {isLoadingTransactions || isLoadingLoans ? <Skeleton className="w-full h-[300px]" /> :
                 <ChartContainer config={chartConfig} className="w-full h-[300px]">
                     {chartType === 'bar' && 
                         <BarChart data={balanceChartData}>
                             <CartesianGrid vertical={false} />
                             <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                            <YAxis />
+                            <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
                             <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                             <Bar dataKey="emprestimos" fill="var(--color-emprestimos)" radius={4} />
                             <Bar dataKey="receitas" fill="var(--color-receitas)" radius={4} />
@@ -372,7 +303,7 @@ export default function Dashboard() {
                         <LineChart data={balanceChartData}>
                             <CartesianGrid vertical={false} />
                             <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                            <YAxis />
+                            <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
                             <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                             <Line dataKey="emprestimos" stroke="var(--color-emprestimos)" />
                             <Line dataKey="receitas" stroke="var(--color-receitas)" />
@@ -383,7 +314,7 @@ export default function Dashboard() {
                         <AreaChart data={balanceChartData}>
                             <CartesianGrid vertical={false} />
                             <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                            <YAxis />
+                            <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
                             <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                             <Area dataKey="emprestimos" fill="var(--color-emprestimos)" stroke="var(--color-emprestimos)" />
                             <Area dataKey="receitas" fill="var(--color-receitas)" stroke="var(--color-receitas)" />
@@ -435,3 +366,5 @@ export default function Dashboard() {
     </div>
   )
 }
+
+    
