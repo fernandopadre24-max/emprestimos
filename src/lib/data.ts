@@ -1,11 +1,10 @@
-
 import { Customer, Loan, ChartData, BankData, BankSummary, BankAccount, Transaction, Installment, Category } from '@/lib/types';
 import { addMonths, formatISO } from 'date-fns';
 
 // This file is now primarily for generating initial data structures or for utility functions.
 // The mock data arrays have been removed as the app now connects to Firestore.
 
-export const generateInstallments = (loan: Omit<Loan, 'installments' | 'id'> & {id?: string}): Installment[] => {
+export const generateInstallments = (loan: Omit<Loan, 'installments' | 'id' | 'loanCode'> & {id?: string, loanCode?: string}): Installment[] => {
     const installments: Installment[] = [];
     const principal = loan.amount;
     const monthlyRate = loan.interestRate;
@@ -32,5 +31,3 @@ export const generateInstallments = (loan: Omit<Loan, 'installments' | 'id'> & {
     }
     return installments;
 }
-
-    
