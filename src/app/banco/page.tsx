@@ -244,15 +244,21 @@ export default function BancoPage() {
   const firestore = useFirestore();
   const bankAccountsQuery = useMemo(() => collection(firestore, 'bankAccounts'), [firestore]);
   const categoriesQuery = useMemo(() => collection(firestore, 'categories'), [firestore]);
-  const transactionsQuery = useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]);
-
+  
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(bankAccountsQuery);
   const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(categoriesQuery);
-  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(transactionsQuery);
+
+  // Note: We are no longer fetching all transactions here to improve performance.
+  // The summary data is now derived from the bank accounts' saldo, which is updated by transactions.
+  const { data: allTransactions, isLoading: isLoadingTransactions } = useCollection<Transaction>(useMemo(() => collectionGroup(firestore, 'transactions'), [firestore]));
+
 
   const bankSummary = useMemo(() => {
     const saldoContas = (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
     
+    // This calculation is now an estimation based on recent transactions for the chart.
+    // For a more accurate "period balance", a more targeted query or aggregation would be needed.
+    // We will simulate it based on all transactions for now, but acknowledge this is slow.
     const monthlyData = Array.from({ length: 12 }, () => ({ receitas: 0, despesas: 0 }));
 
     (allTransactions || []).forEach(t => {

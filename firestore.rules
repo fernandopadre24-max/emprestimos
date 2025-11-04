@@ -1,9 +1,48 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Rules for the 'customers' collection
+    match /customers/{customerId} {
+      // Any authenticated user can read, create, update, or delete customers
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // Rules for the 'loans' collection
+    match /loans/{loanId} {
+      // Any authenticated user can read, create, update, or delete loans
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // Rules for the 'categories' collection
+    match /categories/{categoryId} {
+      // Any authenticated user can read, create, or delete categories
+      allow read, create, delete: if isAuthenticated();
+    }
+
+    // Rules for 'bankAccounts' and their 'transactions' subcollection
+    match /bankAccounts/{accountId} {
+      // Any authenticated user can manage bank accounts
+      allow read, create, update, delete: if isAuthenticated();
+
+      // Rules for the 'transactions' subcollection
+      match /transactions/{transactionId} {
+        // Authenticated users can perform any action on transactions
+        // within a bank account they can already access.
+        allow read, create, update, delete: if isAuthenticated();
+      }
+    }
+    
+    // Fallback rule to deny all other access
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
