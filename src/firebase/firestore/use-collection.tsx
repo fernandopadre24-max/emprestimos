@@ -21,6 +21,11 @@ export function useCollection<T>(q: Query<T> | null) {
       setIsLoading(false);
       return;
     }
+    
+    // Reset state when query changes
+    setIsLoading(true);
+    setData(null);
+    setError(null);
 
     const unsubscribe = onSnapshot(
       q,
