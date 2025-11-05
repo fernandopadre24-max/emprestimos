@@ -23,7 +23,7 @@ import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useFirestore } from "@/firebase"
-import { collection, query, runTransaction, doc, getDocs } from "firebase/firestore"
+import { collection, query, runTransaction, doc, getDocs, getDoc } from "firebase/firestore"
 import { deleteLoan, updateLoan } from "@/lib/loans"
 import { addTransaction, deleteTransactionsBySource } from "@/lib/transactions"
 import { useToast } from "@/hooks/use-toast"
@@ -102,7 +102,7 @@ export default function EmprestimosPage() {
   
 
   const customersWithLoans = useMemo(() => {
-    if (!loans || !customers) return [];
+    if (isLoading) return [];
     
     const customerLoanMap = loans.reduce((acc, loan) => {
       const customer = customers.find(c => c.id === loan.customerId);
@@ -119,7 +119,7 @@ export default function EmprestimosPage() {
     }, {} as Record<string, Customer & { loans: Loan[] }>);
 
     return Object.values(customerLoanMap).sort((a,b) => a.name.localeCompare(b.name));
-  }, [loans, customers]);
+  }, [loans, customers, isLoading]);
 
   const handleDeleteLoan = async (loan: Loan) => {
     // Before deleting the loan, revert any disbursement transaction associated with it.
@@ -177,7 +177,7 @@ export default function EmprestimosPage() {
         transaction.update(loanRef, { installments: newInstallments, status: newLoanStatus });
 
          // Add transaction to bank account
-        const customer = customers?.find(c => c.id === currentLoan.customerId);
+        const customer = customers.find(c => c.id === currentLoan.customerId);
         addTransaction(firestore, accountId, {
             description: `Pagamento Parcela ${newInstallments.find(i=>i.id===installmentId)?.installmentNumber} - ${customer?.name}`,
             amount: amountPaid,
@@ -416,7 +416,7 @@ export default function EmprestimosPage() {
         onOpenChange={setCreditDialogOpen}
         onSubmit={handleConfirmPayment}
         paymentDetails={paymentDetails}
-        accounts={bankAccounts || []}
+        accounts={bankAccounts}
       />
       <EditLoanDialog
         isOpen={isEditDialogOpen}
@@ -427,3 +427,5 @@ export default function EmprestimosPage() {
     </>
   )
 }
+
+    

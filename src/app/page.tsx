@@ -38,6 +38,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
+      if (!firestore) return;
       setIsLoading(true);
       try {
         const loansQuery = query(collection(firestore, "loans"));
@@ -64,9 +65,7 @@ export default function Dashboard() {
         setIsLoading(false);
       }
     }
-    if (firestore) {
-      fetchData();
-    }
+    fetchData();
   }, [firestore]);
 
 
@@ -81,7 +80,7 @@ export default function Dashboard() {
   }, [loans]);
 
   const getCustomerName = (customerId: string) => {
-    return customers?.find(c => c.id === customerId)?.name || 'Desconhecido';
+    return customers.find(c => c.id === customerId)?.name || 'Desconhecido';
   }
 
   return (
@@ -233,3 +232,5 @@ export default function Dashboard() {
     </div>
   )
 }
+
+    
