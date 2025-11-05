@@ -23,7 +23,7 @@ import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCollection, useFirestore } from "@/firebase"
-import { collection, query, runTransaction, where, getDocs } from "firebase/firestore"
+import { collection, query, runTransaction, doc } from "firebase/firestore"
 import { deleteLoan, updateLoan } from "@/lib/loans"
 import { addTransaction, deleteTransactionsBySource } from "@/lib/transactions"
 import { useToast } from "@/hooks/use-toast"
@@ -121,12 +121,12 @@ export default function EmprestimosPage() {
   
   const handleConfirmPayment = async (loanId: string, installmentId: string, accountId: string, amountPaid: number) => {
     await runTransaction(firestore, async (transaction) => {
-        const loanRef = collection(firestore, 'loans');
-        const q = query(loanRef, where('id', '==', loanId));
-        const loanDocs = await getDocs(q);
-        const loanDoc = loanDocs.docs[0];
+        const loanRef = doc(firestore, 'loans', loanId);
+        const loanDoc = await transaction.get(loanRef);
         
-        if (!loanDoc) throw new Error("Loan not found");
+        if (!loanDoc.exists()) {
+            throw new Error("Empréstimo não encontrado");
+        }
 
         const currentLoan = loanDoc.data() as Loan;
         const newInstallments = currentLoan.installments.map(inst => {
@@ -142,7 +142,7 @@ export default function EmprestimosPage() {
         const allInstallmentsPaid = newInstallments.every(inst => inst.status === 'Paga');
         const newLoanStatus = allInstallmentsPaid ? 'Pago' : currentLoan.status;
         
-        transaction.update(loanDoc.ref, { installments: newInstallments, status: newLoanStatus });
+        transaction.update(loanRef, { installments: newInstallments, status: newLoanStatus });
 
          // Add transaction to bank account
         const customer = customers?.find(c => c.id === currentLoan.customerId);
@@ -160,24 +160,26 @@ export default function EmprestimosPage() {
   
   const handleRevertPayment = async (loan: Loan, installment: Installment) => {
      await runTransaction(firestore, async (transaction) => {
-        const loanRef = collection(firestore, 'loans');
-        const q = query(loanRef, where('id', '==', loan.id));
-        const loanDocs = await getDocs(q);
-        const loanDoc = loanDocs.docs[0];
+        const loanRef = doc(firestore, 'loans', loan.id);
+        const loanDoc = await transaction.get(loanRef);
 
-        if (!loanDoc) throw new Error("Loan not found");
+        if (!loanDoc.exists()) {
+            throw new Error("Empréstimo não encontrado");
+        }
+        
+        const currentLoan = loanDoc.data() as Loan;
 
-        const newInstallments = loan.installments.map(inst => {
+        const newInstallments = currentLoan.installments.map(inst => {
             if (inst.id === installment.id) {
             return { ...inst, status: 'Pendente' as const, paidAmount: 0 };
             }
             return inst;
         });
         
-        const wasPaid = loan.status === 'Pago';
-        const newLoanStatus = wasPaid ? 'Em dia' : loan.status;
+        const wasPaid = currentLoan.status === 'Pago';
+        const newLoanStatus = wasPaid ? 'Em dia' : currentLoan.status;
 
-        transaction.update(loanDoc.ref, { installments: newInstallments, status: newLoanStatus });
+        transaction.update(loanRef, { installments: newInstallments, status: newLoanStatus });
      });
     
     // Also revert the transaction from the bank account
