@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import {
   Table,
   TableBody,
@@ -22,8 +22,8 @@ import { CreditPaymentDialog } from "@/components/emprestimos/credit-payment-dia
 import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCollection, useFirestore } from "@/firebase"
-import { collection, query, runTransaction, doc } from "firebase/firestore"
+import { useFirestore } from "@/firebase"
+import { collection, query, runTransaction, doc, getDocs } from "firebase/firestore"
 import { deleteLoan, updateLoan } from "@/lib/loans"
 import { addTransaction, deleteTransactionsBySource } from "@/lib/transactions"
 import { useToast } from "@/hooks/use-toast"
@@ -33,11 +33,43 @@ export default function EmprestimosPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(query(collection(firestore, "loans")));
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(query(collection(firestore, "customers")));
-  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(query(collection(firestore, "bankAccounts")));
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingAccounts;
+  useEffect(() => {
+    async function fetchData() {
+      if (!firestore) return;
+      setIsLoading(true);
+      try {
+        const loansQuery = query(collection(firestore, "loans"));
+        const customersQuery = query(collection(firestore, "customers"));
+        const bankAccountsQuery = query(collection(firestore, "bankAccounts"));
+        
+        const [loansSnapshot, customersSnapshot, bankAccountsSnapshot] = await Promise.all([
+          getDocs(loansQuery),
+          getDocs(customersQuery),
+          getDocs(bankAccountsQuery),
+        ]);
+        
+        const loansData = loansSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Loan[];
+        const customersData = customersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Customer[];
+        const bankAccountsData = bankAccountsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as BankAccount[];
+        
+        setLoans(loansData);
+        setCustomers(customersData);
+        setBankAccounts(bankAccountsData);
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, [firestore]);
+
 
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<string[]>([]);
   const [expandedLoanIds, setExpandedLoanIds] = useState<string[]>([]);
@@ -72,7 +104,7 @@ export default function EmprestimosPage() {
   const customersWithLoans = useMemo(() => {
     if (!loans || !customers) return [];
     
-    const customerLoanMap = (loans || []).reduce((acc, loan) => {
+    const customerLoanMap = loans.reduce((acc, loan) => {
       const customer = customers.find(c => c.id === loan.customerId);
       if (customer) {
         if (!acc[customer.id]) {
@@ -395,5 +427,3 @@ export default function EmprestimosPage() {
     </>
   )
 }
-
-    

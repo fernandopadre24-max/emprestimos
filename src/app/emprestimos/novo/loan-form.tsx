@@ -30,8 +30,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCollection, useFirestore } from "@/firebase";
-import { collection, query } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
+import { collection, query, getDocs } from "firebase/firestore";
 import { addLoan } from "@/lib/loans";
 import { addTransaction } from "@/lib/transactions";
 
@@ -57,9 +57,33 @@ export default function LoanForm() {
   const router = useRouter();
   const firestore = useFirestore();
 
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(query(collection(firestore, "customers")));
-  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(query(collection(firestore, "bankAccounts")));
-  const isLoading = isLoadingCustomers || isLoadingAccounts;
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!firestore) return;
+      setIsLoading(true);
+      try {
+        const customersQuery = query(collection(firestore, "customers"));
+        const accountsQuery = query(collection(firestore, "bankAccounts"));
+        const [customersSnapshot, accountsSnapshot] = await Promise.all([
+          getDocs(customersQuery),
+          getDocs(accountsQuery),
+        ]);
+        const customersData = customersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Customer[];
+        const accountsData = accountsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as BankAccount[];
+        setCustomers(customersData);
+        setBankAccounts(accountsData);
+      } catch (error) {
+        console.error("Error fetching form data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, [firestore]);
 
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   
@@ -116,7 +140,7 @@ export default function LoanForm() {
         return;
     }
 
-    const customer = (customers || []).find(c => c.id === values.customerId);
+    const customer = customers.find(c => c.id === values.customerId);
     
     if (!customer) {
         toast({
@@ -209,7 +233,7 @@ export default function LoanForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(customers || []).map(customer => (
+                      {customers.map(customer => (
                         <SelectItem key={customer.id} value={customer.id}>
                           {customer.name} ({customer.cpf})
                         </SelectItem>
@@ -233,7 +257,7 @@ export default function LoanForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(bankAccounts || []).map(account => (
+                      {bankAccounts.map(account => (
                         <SelectItem key={account.id} value={account.id}>
                           {account.banco} ({account.conta}) - Saldo: {account.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </SelectItem>
@@ -397,5 +421,3 @@ export default function LoanForm() {
     </Form>
   );
 }
-
-    

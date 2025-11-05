@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useMemo, useEffect, useState } from "react"
 import {
   Card,
   CardContent,
@@ -21,8 +21,8 @@ import { Badge } from "@/components/ui/badge"
 import { CircleDollarSign, CreditCard, Users } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import { useCollection, useFirestore } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { useFirestore } from "@/firebase"
+import { collection, query, getDocs } from "firebase/firestore"
 import type { Loan, Customer, BankAccount } from "@/lib/types"
 import { format, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -31,17 +31,51 @@ import { ptBR } from "date-fns/locale"
 export default function Dashboard() {
   
   const firestore = useFirestore();
-  const { data: loans, isLoading: isLoadingLoans } = useCollection<Loan>(query(collection(firestore, "loans")));
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(query(collection(firestore, "customers")));
-  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(query(collection(firestore, "bankAccounts")));
-  const isLoading = isLoadingLoans || isLoadingCustomers || isLoadingAccounts;
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const totalLoanAmount = useMemo(() => (loans || []).reduce((sum, loan) => sum + loan.amount, 0), [loans]);
-  const totalBalance = useMemo(() => (bankAccounts || []).reduce((sum, acc) => sum + acc.saldo, 0), [bankAccounts]);
-  const activeCustomers = useMemo(() => (customers || []).filter(c => c.loanStatus === 'Ativo' || c.loanStatus === 'Inadimplente').length, [customers]);
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      try {
+        const loansQuery = query(collection(firestore, "loans"));
+        const customersQuery = query(collection(firestore, "customers"));
+        const bankAccountsQuery = query(collection(firestore, "bankAccounts"));
+        
+        const [loansSnapshot, customersSnapshot, bankAccountsSnapshot] = await Promise.all([
+          getDocs(loansQuery),
+          getDocs(customersQuery),
+          getDocs(bankAccountsQuery),
+        ]);
+        
+        const loansData = loansSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Loan[];
+        const customersData = customersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Customer[];
+        const bankAccountsData = bankAccountsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as BankAccount[];
+        
+        setLoans(loansData);
+        setCustomers(customersData);
+        setBankAccounts(bankAccountsData);
+
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    if (firestore) {
+      fetchData();
+    }
+  }, [firestore]);
+
+
+  const totalLoanAmount = useMemo(() => loans.reduce((sum, loan) => sum + loan.amount, 0), [loans]);
+  const totalBalance = useMemo(() => bankAccounts.reduce((sum, acc) => sum + acc.saldo, 0), [bankAccounts]);
+  const activeCustomers = useMemo(() => customers.filter(c => c.loanStatus === 'Ativo' || c.loanStatus === 'Inadimplente').length, [customers]);
   
   const recentLoans = useMemo(() => {
-    return (loans || [])
+    return loans
       .sort((a, b) => parseISO(b.startDate).getTime() - parseISO(a.startDate).getTime())
       .slice(0, 5);
   }, [loans]);
@@ -67,7 +101,7 @@ export default function Dashboard() {
             </div>
             }
             <p className="text-xs text-muted-foreground">
-              Total de {(loans || []).length} empréstimos concedidos.
+              Total de {loans.length} empréstimos concedidos.
             </p>
           </CardContent>
         </Card>
@@ -81,7 +115,7 @@ export default function Dashboard() {
             <div className="text-2xl font-bold font-headline">+{activeCustomers}</div>
             }
             <p className="text-xs text-muted-foreground">
-              Total de {(customers || []).length} clientes cadastrados.
+              Total de {customers.length} clientes cadastrados.
             </p>
           </CardContent>
         </Card>
@@ -178,12 +212,12 @@ export default function Dashboard() {
                         <TableCell className="text-right"><Skeleton className="h-4 w-24" /></TableCell>
                     </TableRow>
               ))}
-              {!isLoading && (bankAccounts || []).length === 0 && (
+              {!isLoading && bankAccounts.length === 0 && (
                  <TableRow>
                     <TableCell colSpan={3} className="text-center text-muted-foreground">Nenhuma conta bancária cadastrada.</TableCell>
                 </TableRow>
               )}
-               {!isLoading && (bankAccounts || []).map(account => (
+               {!isLoading && bankAccounts.map(account => (
                     <TableRow key={account.id}>
                         <TableCell>{account.banco}</TableCell>
                         <TableCell>{account.conta}</TableCell>
@@ -199,5 +233,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
-    

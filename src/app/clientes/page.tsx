@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import {
   Table,
   TableBody,
@@ -21,13 +21,32 @@ import { AddCustomerDialog } from "@/components/clientes/add-customer-dialog"
 import { EditCustomerDialog } from "@/components/clientes/edit-customer-dialog"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCollection, useFirestore } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { useFirestore } from "@/firebase"
+import { collection, query, getDocs } from "firebase/firestore"
 import { addCustomer, deleteCustomer, updateCustomer } from "@/lib/customers"
 
 export default function ClientesPage() {
   const firestore = useFirestore();
-  const { data: customers, isLoading } = useCollection<Customer>(query(collection(firestore, "customers")));
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!firestore) return;
+      setIsLoading(true);
+      try {
+        const customersQuery = query(collection(firestore, "customers"));
+        const snapshot = await getDocs(customersQuery);
+        const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Customer[];
+        setCustomers(data);
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, [firestore]);
 
 
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
@@ -106,12 +125,12 @@ export default function ClientesPage() {
                   <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
                 </TableRow>
               ))}
-              {!isLoading && (customers || []).length === 0 && (
+              {!isLoading && customers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">Nenhum cliente cadastrado.</TableCell>
                 </TableRow>
               )}
-              {!isLoading && (customers || []).map((customer: Customer) => {
+              {!isLoading && customers.map((customer: Customer) => {
                 const isExpanded = expandedRows.includes(customer.id);
                 const date = parseISO(customer.registrationDate);
                 return (
@@ -183,5 +202,3 @@ export default function ClientesPage() {
     </>
   )
 }
-
-    

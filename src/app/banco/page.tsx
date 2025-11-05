@@ -54,7 +54,7 @@ import { useCollection, useFirestore } from "@/firebase"
 import { addTransaction, deleteTransaction, updateTransaction } from "@/lib/transactions"
 import { addBankAccount, deleteBankAccount, updateBankAccount } from "@/lib/bank"
 import { addCategory, deleteCategory } from "@/lib/categories"
-import { collection, query } from "firebase/firestore"
+import { collection, query, getDocs } from "firebase/firestore"
 
 interface FilterState {
   searchTerm: string;
@@ -93,7 +93,8 @@ function AccountTransactions({ accountId, categories }: { accountId: string, cat
   };
 
   const filteredTransactions = useMemo(() => {
-    return (transactions || [])
+    if (!transactions) return [];
+    return transactions
       .filter(t => t.description.toLowerCase().includes(filters.searchTerm.toLowerCase()))
       .filter(t => filters.type === 'todos' ? true : t.type === filters.type)
       .filter(t => {
@@ -239,12 +240,40 @@ function AccountTransactions({ accountId, categories }: { accountId: string, cat
 
 export default function BancoPage() {
   const firestore = useFirestore();
-  const { data: bankAccounts, isLoading: isLoadingAccounts } = useCollection<BankAccount>(query(collection(firestore, "bankAccounts")));
-  const { data: categories, isLoading: isLoadingCategories } = useCollection<Category>(query(collection(firestore, "categories")));
-  const isLoading = isLoadingAccounts || isLoadingCategories;
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!firestore) return;
+      setIsLoading(true);
+      try {
+        const accountsQuery = query(collection(firestore, "bankAccounts"));
+        const categoriesQuery = query(collection(firestore, "categories"));
+        
+        const [accountsSnapshot, categoriesSnapshot] = await Promise.all([
+          getDocs(accountsQuery),
+          getDocs(categoriesQuery)
+        ]);
+
+        const accountsData = accountsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as BankAccount[];
+        const categoriesData = categoriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Category[];
+        
+        setBankAccounts(accountsData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, [firestore]);
+
 
   const totalBalance = useMemo(() => {
-    return (bankAccounts || []).reduce((acc, account) => acc + account.saldo, 0);
+    return bankAccounts.reduce((acc, account) => acc + account.saldo, 0);
   }, [bankAccounts]);
 
 
@@ -363,12 +392,12 @@ export default function BancoPage() {
                   <TableCell className="text-right"><div className="flex justify-end gap-2"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-8" /></div></TableCell>
                 </TableRow>
               ))}
-              {!isLoading && (bankAccounts || []).length === 0 && (
+              {!isLoading && bankAccounts.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground">Nenhuma conta cadastrada.</TableCell>
                 </TableRow>
               )}
-              {!isLoading && (bankAccounts || []).map((account: BankAccount) => {
+              {!isLoading && bankAccounts.map((account: BankAccount) => {
                 const isExpanded = expandedRows.includes(account.id);
                 return (
                   <React.Fragment key={account.id}>
@@ -404,7 +433,7 @@ export default function BancoPage() {
                     {isExpanded && (
                       <TableRow>
                         <TableCell colSpan={6}>
-                          <AccountTransactions accountId={account.id} categories={categories || []} />
+                          <AccountTransactions accountId={account.id} categories={categories} />
                         </TableCell>
                       </TableRow>
                     )}
@@ -435,18 +464,16 @@ export default function BancoPage() {
         onSubmit={handleNewTransaction}
         transactionType={transactionType}
         account={selectedAccount}
-        categories={categories || []}
+        categories={categories}
       />
       
       <ManageCategoriesDialog
         isOpen={isManageCategoriesOpen}
         onOpenChange={setManageCategoriesOpen}
-        categories={categories || []}
+        categories={categories}
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
       />
     </>
   )
 }
-
-    
