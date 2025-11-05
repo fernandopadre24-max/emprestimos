@@ -23,7 +23,7 @@ import { EditLoanDialog } from "@/components/emprestimos/edit-loan-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCollection, useFirestore } from "@/firebase"
-import { collection, query, runTransaction } from "firebase/firestore"
+import { collection, query, runTransaction, where, getDocs } from "firebase/firestore"
 import { deleteLoan, updateLoan } from "@/lib/loans"
 import { addTransaction, deleteTransactionsBySource } from "@/lib/transactions"
 import { useToast } from "@/hooks/use-toast"
@@ -122,7 +122,10 @@ export default function EmprestimosPage() {
   const handleConfirmPayment = async (loanId: string, installmentId: string, accountId: string, amountPaid: number) => {
     await runTransaction(firestore, async (transaction) => {
         const loanRef = collection(firestore, 'loans');
-        const loanDoc = (await getDocs(query(loanRef, where('id', '==', loanId)))).docs[0];
+        const q = query(loanRef, where('id', '==', loanId));
+        const loanDocs = await getDocs(q);
+        const loanDoc = loanDocs.docs[0];
+        
         if (!loanDoc) throw new Error("Loan not found");
 
         const currentLoan = loanDoc.data() as Loan;
@@ -158,7 +161,10 @@ export default function EmprestimosPage() {
   const handleRevertPayment = async (loan: Loan, installment: Installment) => {
      await runTransaction(firestore, async (transaction) => {
         const loanRef = collection(firestore, 'loans');
-        const loanDoc = (await getDocs(query(loanRef, where('id', '==', loan.id)))).docs[0];
+        const q = query(loanRef, where('id', '==', loan.id));
+        const loanDocs = await getDocs(q);
+        const loanDoc = loanDocs.docs[0];
+
         if (!loanDoc) throw new Error("Loan not found");
 
         const newInstallments = loan.installments.map(inst => {
